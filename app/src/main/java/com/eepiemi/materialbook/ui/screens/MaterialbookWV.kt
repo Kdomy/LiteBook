@@ -3,6 +3,8 @@ package com.eepiemi.materialbook.ui.screens
 import android.content.Intent
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.WebSettings
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -84,9 +86,21 @@ fun MaterialbookWebView(
         }
     }
 
+    // Fullscreen video (onShowCustomView) support + media permissions.
+    var isVideoFullscreen by remember { mutableStateOf(false) }
+    val webViewParams = fileChooserWebViewParams(
+        fullscreenHost = activity?.window?.decorView as? FrameLayout,
+        onFullscreenChange = { isVideoFullscreen = it }
+    )
+    val hideFullscreen = webViewParams.second
+
     // allow exiting while scrolling to top.
     var exitScroll by remember { mutableStateOf(false) }
     BackHandler {
+        if (isVideoFullscreen) {
+            hideFullscreen()
+            return@BackHandler
+        }
         if (exitScroll) {
             activity?.finish()
         } else {
@@ -253,7 +267,7 @@ fun MaterialbookWebView(
             ),
         state = state,
         navigator = navigator,
-        platformWebViewParams = fileChooserWebViewParams(),
+        platformWebViewParams = webViewParams.first,
         captureBackPresses = false,
         onCreated = { webView ->
 
@@ -268,10 +282,12 @@ fun MaterialbookWebView(
                 androidWebSettings.apply {
                     //isDebugInspectorInfoEnabled = true
                     domStorageEnabled = true
-                    hideDefaultVideoPoster = true
+                    allowProtectedMedia = true
                     mediaPlaybackRequiresUserGesture = false
                 }
             }
+
+            webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
             webView.apply {
                 addJavascriptInterface(

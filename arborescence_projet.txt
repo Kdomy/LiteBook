@@ -1,0 +1,159 @@
+PROJET : Materialbook
+CHEMIN : D:\01_WORKSPACE\Github\Materialbook
+==================================================
+
+├── .github/
+│   ├── FUNDING.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.yml
+│   │   ├── config.yml
+│   │   └── feature_request.yml
+│   └── workflows/
+│       └── create-release.yml
+├── .gitignore
+├── CHANGE.md
+├── LICENSE
+├── README.md
+├── app/
+│   ├── .gitignore
+│   ├── build.gradle.kts
+│   ├── proguard-rules.pro
+│   └── src/
+│       ├── androidTest/
+│       │   └── java/
+│       │       └── com/
+│       │           └── eepiemi/
+│       │               └── materialbook/
+│       │                   └── ExampleInstrumentedTest.kt
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── java/
+│       │   │   └── com/
+│       │   │       └── eepiemi/
+│       │   │           └── materialbook/
+│       │   │               ├── MainActivity.kt
+│       │   │               ├── data/
+│       │   │               │   └── local/
+│       │   │               │       └── SettingsDataStore.kt
+│       │   │               ├── ui/
+│       │   │               │   ├── components/
+│       │   │               │   │   ├── NetworkErrorDialog.kt
+│       │   │               │   │   └── settings/
+│       │   │               │   │       ├── SettingsContent.kt
+│       │   │               │   │       ├── SettingsDialog.kt
+│       │   │               │   │       └── SettingsItem.kt
+│       │   │               │   ├── screens/
+│       │   │               │   │   ├── MaterialbookWV.kt
+│       │   │               │   │   └── SplashLoading.kt
+│       │   │               │   ├── theme/
+│       │   │               │   │   ├── Theme.kt
+│       │   │               │   │   └── Type.kt
+│       │   │               │   └── viewmodel/
+│       │   │               │       ├── MainViewModel.kt
+│       │   │               │       └── SettingsViewModel.kt
+│       │   │               └── utils/
+│       │   │                   ├── ExternalRequestInterceptor.kt
+│       │   │                   ├── FilePicker.kt
+│       │   │                   ├── desktopUserAgent.kt
+│       │   │                   ├── fbRedirectSanitizer.kt
+│       │   │                   ├── fetchScripts.kt
+│       │   │                   ├── isAutoDesktop.kt
+│       │   │                   ├── jsBridge/
+│       │   │                   │   ├── ClipboardBridge.kt
+│       │   │                   │   ├── DownloadBridge.kt
+│       │   │                   │   ├── MaterialYouBridge.kt
+│       │   │                   │   ├── MaterialbookSettings.kt
+│       │   │                   │   └── ThemeChange.kt
+│       │   │                   ├── rememberAutoDesktop.kt
+│       │   │                   └── rememberImeHeight.kt
+│       │   └── res/
+│       │       ├── drawable/
+│       │       │   ├── ic_launcher_background.xml
+│       │       │   ├── ic_launcher_foreground.xml
+│       │       │   └── ic_launcher_monochrome.xml
+│       │       ├── mipmap-anydpi-v26/
+│       │       │   └── ic_launcher.xml
+│       │       ├── raw/
+│       │       │   ├── adblock.js
+│       │       │   ├── amoled_black.js
+│       │       │   ├── copy_to_clipboard.js
+│       │       │   ├── download_content.js
+│       │       │   ├── hide_groups.js
+│       │       │   ├── hide_pymk.js
+│       │       │   ├── hide_reels.js
+│       │       │   ├── hide_stories.js
+│       │       │   ├── hide_suggested.js
+│       │       │   ├── material_you.js
+│       │       │   ├── pinch_to_zoom.js
+│       │       │   ├── scripts.js
+│       │       │   └── sticky_navbar.js
+│       │       ├── values/
+│       │       │   ├── colors.xml
+│       │       │   ├── strings.xml
+│       │       │   └── themes.xml
+│       │       ├── values-ar/
+│       │       │   └── strings.xml
+│       │       ├── values-bn/
+│       │       │   └── strings.xml
+│       │       ├── values-de/
+│       │       │   └── strings.xml
+│       │       ├── values-es/
+│       │       │   └── strings.xml
+│       │       ├── values-fr/
+│       │       │   └── strings.xml
+│       │       ├── values-night/
+│       │       │   ├── colors.xml
+│       │       │   └── themes.xml
+│       │       ├── values-night-v31/
+│       │       │   ├── colors.xml
+│       │       │   └── themes.xml
+│       │       ├── values-pt/
+│       │       │   └── strings.xml
+│       │       ├── values-v31/
+│       │       │   ├── colors.xml
+│       │       │   └── themes.xml
+│       │       ├── values-zh-rTW/
+│       │       │   └── strings.xml
+│       │       └── xml/
+│       │           ├── backup_rules.xml
+│       │           ├── data_extraction_rules.xml
+│       │           └── file_provider_paths.xml
+│       └── test/
+│           ├── .gitignore
+│           ├── java/
+│           │   └── com/
+│           │       └── eepiemi/
+│           │           └── materialbook/
+│           │               ├── AdblockTest.kt
+│           │               ├── Readme.md
+│           │               └── utils/
+│           │                   ├── generateAuth.kt
+│           │                   ├── getAuthPath.kt
+│           │                   └── testExt.kt
+│           └── resources/
+│               ├── Readme.md
+│               └── auth-sample.json
+├── assets/
+│   ├── buy_me_a_coffee.svg
+│   ├── download.svg
+│   └── open_issue.svg
+├── build.gradle.kts
+├── fastlane/
+│   └── metadata/
+│       └── android/
+│           └── en-US/
+│               ├── full_description.txt
+│               ├── images/
+│               │   └── phoneScreenshots/
+│               ├── short_description.txt
+│               └── title.txt
+├── gradle/
+│   ├── libs.versions.toml
+│   └── wrapper/
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+├── gradle.properties
+├── gradlew
+├── gradlew.bat
+├── scan_project.py
+└── settings.gradle.kts
