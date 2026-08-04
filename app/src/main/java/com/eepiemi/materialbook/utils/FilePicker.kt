@@ -4,8 +4,13 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebView
+import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,11 +26,25 @@ import com.multiplatform.webview.web.PlatformWebViewParams
 // src: https://github.com/KevinnZou/compose-webview-multiplatform
 
 @Composable
-fun fileChooserWebViewParams(): PlatformWebViewParams {
+fun fileChooserWebViewParams(
+    fullscreenHost: FrameLayout? = null,
+    onFullscreenChange: (Boolean) -> Unit = {},
+): Pair<PlatformWebViewParams, () -> Unit> {
     var fileChooserIntent by remember { mutableStateOf<Intent?>(null) }
 
     val webViewChromeClient =
-        remember { FileChoosableWebChromeClient { fileChooserIntent = it } }
+        remember {
+            FileChoosableWebChromeClient(
+                fullscreenHost = fullscreenHost,
+                onShowFilePicker = { fileChooserIntent = it },
+                onFullscreenChange = onFullscreenChange,
+            )
+        }
+
+    val hideFullscreen =
+        remember {
+            { webViewChromeClient.hideCustomView() }
+        }
 
     val launcher =
         rememberLauncherForActivityResult(
@@ -64,7 +83,7 @@ fun fileChooserWebViewParams(): PlatformWebViewParams {
         }
     }
 
-    return PlatformWebViewParams(chromeClient = webViewChromeClient)
+    return PlatformWebViewParams(chromeClient = webViewChromeClient) to hideFullscreen
 }
 
 private fun Intent.getUris(): List<Uri>? {
@@ -73,9 +92,14 @@ private fun Intent.getUris(): List<Uri>? {
 }
 
 private class FileChoosableWebChromeClient(
+    private val fullscreenHost: FrameLayout?,
     private val onShowFilePicker: (Intent) -> Unit,
+    private val onFullscreenChange: (Boolean) -> Unit,
 ) : AccompanistWebChromeClient() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     override fun onShowFileChooser(
         webView: WebView?,
@@ -89,6 +113,52 @@ private class FileChoosableWebChromeClient(
         else onShowFilePicker(filePickerIntent)
 
         return true
+    }
+
+    override fun onShowCustomView(
+        view: View?,
+        callback: WebChromeClient.CustomViewCallback?,
+    ) {
+        if (customView != null) {
+            callback?.onCustomViewHidden()
+            return
+        }
+
+        val host = fullscreenHost
+        if (view == null || host == null) {
+            callback?.onCustomViewHidden()
+            return
+        }
+
+        customView = view
+        customViewCallback = callback
+        host.addView(
+            view,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        onFullscreenChange(true)
+    }
+
+    override fun onHideCustomView() {
+        val view = customView
+        if (view != null) {
+            (view.parent as? ViewGroup)?.removeView(view)
+        }
+        customViewCallback?.onCustomViewHidden()
+        customView = null
+        customViewCallback = null
+        onFullscreenChange(false)
+    }
+
+    override fun onPermissionRequest(request: PermissionRequest) {
+        request.grant(request.resources)
+    }
+
+    fun hideCustomView() {
+        if (customView != null) onHideCustomView()
     }
 
     fun onReceiveFiles(uris: Array<Uri>) {
