@@ -16,6 +16,49 @@
   let lastDownloadedUrl = null;
   const DOWNLOAD_BTN_ID = "materialbook-global-downloader";
 
+  // Capture real media URLs from the network. Videos streamed through MSE
+  // have a blob: video.src that cannot be fetched; the actual .mp4 URLs are
+  // requested through fetch/XMLHttpRequest and are captured here.
+  const capturedMediaUrls = [];
+  const MEDIA_URL_RE = /\.(mp4|m4v)(\?|$)/i;
+
+  const captureMediaUrl = (u) => {
+    if (typeof u === "string" && MEDIA_URL_RE.test(u)) {
+      capturedMediaUrls.push(u);
+      if (capturedMediaUrls.length > 50) capturedMediaUrls.shift();
+    }
+  };
+
+  const originalFetch = window.fetch;
+  if (typeof originalFetch === "function") {
+    window.fetch = function(input, init) {
+      if (input && typeof input === "object" && input.url) captureMediaUrl(input.url);
+      else captureMediaUrl(input);
+      return originalFetch.apply(this, arguments);
+    };
+  }
+
+  const originalXhrOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    captureMediaUrl(url);
+    return originalXhrOpen.apply(this, arguments);
+  };
+
+  const mediaSrcDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLMediaElement.prototype,
+    "src"
+  );
+  if (mediaSrcDescriptor && mediaSrcDescriptor.set) {
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      get: mediaSrcDescriptor.get,
+      set: function(value) {
+        captureMediaUrl(value);
+        return mediaSrcDescriptor.set.call(this, value);
+      },
+      configurable: true
+    });
+  }
+
   // Selectors for finding media content
   const SELECTORS = {
     mediaElements: [
@@ -57,11 +100,16 @@
 
   const isElementVisible = (element) => {
     const rect = element.getBoundingClientRect();
-    return (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
-    );
+    if (rect.width <= 0 || rect.height <= 0) return false;
+
+    const vw = window.innerWidth || document.documentElement.clientWidth;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+
+    const visibleW = Math.min(rect.right, vw) - Math.max(rect.left, 0);
+    const visibleH = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
+    if (visibleW <= 0 || visibleH <= 0) return false;
+
+    return (visibleW * visibleH) / (rect.width * rect.height) > 0.5;
   };
 
 
@@ -106,9 +154,12 @@
     const url = window.location.href;
     if (
       url.includes("/stories/") ||
+      url.includes("/story.php") ||
       url.includes("/reel/") ||
+      url.includes("/reels/") ||
+      url.includes("/reels_center") ||
       url.includes("/videos/") ||
-      url.includes("/watch/?") ||
+      url.includes("/watch") ||
       url.includes("/photo") ||
       url.includes("/photos/") ||
       url.includes("/highlights/")
@@ -128,6 +179,34 @@
 
   // Download media from URL
   const downloadMedia = (url) => {
+    if (!url || typeof url !== "string") return;
+
+    const isVideo = /\.(mp4|m4v)(\?|$)/i.test(url) || url.startsWith("blob:");
+
+    if (isVideo) {
+      let realUrl = url;
+      if (url.startsWith("blob:")) {
+        realUrl = capturedMediaUrls[capturedMediaUrls.length - 1] || null;
+      }
+
+      if (!realUrl) {
+        debugLog("No downloadable video URL found for blob source");
+        return;
+      }
+
+      if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
+        // Stream the file natively to avoid loading large videos in memory.
+        window.DownloadBridge.downloadUrl(realUrl, "video/mp4");
+      } else {
+        downloadBase64(realUrl, "video/mp4");
+      }
+      return;
+    }
+
+    downloadBase64(url, "image/jpeg");
+  };
+
+  const downloadBase64 = (url, fallbackMime) => {
     fetch(url)
       .then(response => response.blob())
       .then(blob => {
@@ -137,7 +216,7 @@
             if (reader.result) {
               window.DownloadBridge.downloadBase64File(
                 reader.result,
-                blob.type || "image/jpeg"
+                blob.type || fallbackMime || "image/jpeg"
               );
             }
           };
