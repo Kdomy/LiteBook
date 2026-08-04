@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Materialbook</string>
+    <string name="app_name">LiteBook</string>
     <string name="apply_immediately">立即應用？</string>
     <string name="remove_ads_title">移除廣告</string>
     <string name="download_content_title">下載內容</string>

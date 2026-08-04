@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Materialbook</string>
+    <string name="app_name">LiteBook</string>
 
     <!-- Bottom Text and Buttons -->
     <string name="apply_immediately">Apply Immediately?</string>

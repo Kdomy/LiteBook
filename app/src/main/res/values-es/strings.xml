@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Materialbook</string>
+    <string name="app_name">LiteBook</string>
     <string name="apply_immediately">¿Aplicar inmediatamente?</string>
     <string name="remove_ads_title">Eliminar anuncios</string>
     <string name="download_content_title">Descargar contenido</string>

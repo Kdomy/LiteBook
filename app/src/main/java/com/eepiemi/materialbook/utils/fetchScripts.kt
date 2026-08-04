@@ -8,7 +8,9 @@ import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 
 
-const val SCRIPT_SRC = "https://raw.githubusercontent.com/Kdomy/Newbook/refs/heads/main/app/src/main/res/raw/"
+const val SCRIPT_SRC = "https://raw.githubusercontent.com/Kdomy/LiteBook/refs/heads/main/app/src/main/res/raw/"
+
+const val SCRIPTS_LOCAL_ONLY: Boolean = false
 
 data class Script(
     val isEnabled: Boolean,
@@ -24,15 +26,19 @@ suspend fun fetchScripts(
     return buildString {
         scripts.filter { it.isEnabled }.forEach { script ->
             val content =
-                runCatching {
-                    val res = httpClient.get(SCRIPT_SRC + script.scriptTitle)
-                    if (res.status == HttpStatusCode.OK) {
-                        res.body() as String
-                    } else {
-                        throw Exception()
-                    }
-                }.getOrElse {
+                if (SCRIPTS_LOCAL_ONLY) {
                     fallbackContent(script.resourceId)
+                } else {
+                    runCatching {
+                        val res = httpClient.get(SCRIPT_SRC + script.scriptTitle)
+                        if (res.status == HttpStatusCode.OK) {
+                            res.body() as String
+                        } else {
+                            throw Exception()
+                        }
+                    }.getOrElse {
+                        fallbackContent(script.resourceId)
+                    }
                 }
             append(content)
         }

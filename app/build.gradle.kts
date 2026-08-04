@@ -18,7 +18,7 @@ extensions.configure<ApplicationExtension> {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.eepiemi.materialbook"
+        applicationId = "com.kdomy.litebook"
         minSdk = 23
         targetSdk = 36
         versionCode = 13
