@@ -376,19 +376,3 @@ observer.observe(document.body, { childList: true, subtree: true });
             .observe(meta, { attributes: true, attributeFilter: ['content'] });
     }
 })();
-
-// File Download Script
-(function() {
-    if (window._downloadBridgeInitialized) return;
-    window._downloadBridgeInitialized = true;
-    const originalCreateObjectURL = URL.createObjectURL;
-    URL.createObjectURL = function(blob) {
-        const reader = new FileReader();
-        reader.onloadend = function() {
-            if (reader.result)
-                DownloadBridge.downloadBase64File(reader.result, blob.type);
-        };
-        reader.readAsDataURL(blob);
-        return originalCreateObjectURL(blob);
-    };
-})();
