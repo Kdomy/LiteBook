@@ -24,7 +24,7 @@
     '[aria-label*="menu"]'
   ];
 
-  var HOLD_MS = 500;
+  var HOLD_MS = 450;
   var MOVE_TOLERANCE = 12;
 
   var pressTimer = null;
@@ -131,7 +131,7 @@
     pressTarget = event.target;
     pressTimer = setTimeout(function() {
       pressTimer = null;
-      if (pressTarget && !window.getSelection().toString()) {
+      if (pressTarget) {
         var c = findPostContainer(pressTarget);
         if (c) copyPostText(c);
       }
