@@ -18,6 +18,7 @@
     <string name="download_failed_invalid_data">فشل التنزيل: بيانات غير صالحة</string>
     <string name="failed_to_save_file">فشل حفظ الملف</string>
     <string name="image_copied_to_clipboard">تم نسخ الصورة إلى الحافظة</string>
+    <string name="text_copied_to_clipboard">تم نسخ النص إلى الحافظة</string>
     <string name="copy_failed_invalid_data">فشل النسخ: بيانات غير صالحة</string>
     <string name="copy_failed_invalid_image">فشل النسخ: صورة غير صالحة</string>
     <string name="failed_to_copy_image">فشل نسخ الصورة</string>

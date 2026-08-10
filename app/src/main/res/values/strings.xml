@@ -20,6 +20,7 @@
     <string name="download_failed_invalid_data">Download failed: Invalid data</string>
     <string name="failed_to_save_file">Failed to save file</string>
     <string name="image_copied_to_clipboard">Image copied to clipboard</string>
+    <string name="text_copied_to_clipboard">Text copied to clipboard</string>
     <string name="copy_failed_invalid_data">Copy failed: Invalid data</string>
     <string name="copy_failed_invalid_image">Copy failed: Invalid image</string>
     <string name="failed_to_copy_image">Failed to copy image</string>

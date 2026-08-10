@@ -13,6 +13,7 @@
     <string name="network_error_description">Um Materialbook zu nutzen, mobile Daten aktivieren oder WLAN verbinden.</string>
     <string name="ok">OK</string>
     <string name="saved_to_downloads">In Downloads gespeichert</string>
+    <string name="text_copied_to_clipboard">Text in die Zwischenablage kopiert</string>
     <string name="download_failed_invalid_data">Download fehlgeschlagen: Ungültige Daten</string>
     <string name="failed_to_save_file">Datei konnte nicht gespeichert werden</string>
     <string name="suggested_posts">Vorgeschlagene Beiträge</string>

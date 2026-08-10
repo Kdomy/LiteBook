@@ -17,6 +17,7 @@
     <string name="download_failed_invalid_data">Descarga fallida: datos inválidos</string>
     <string name="failed_to_save_file">Error al guardar el archivo</string>
     <string name="image_copied_to_clipboard">Imagen copiada al portapapeles</string>
+    <string name="text_copied_to_clipboard">Texto copiado al portapapeles</string>
     <string name="copy_failed_invalid_data">Copia fallida: datos inválidos</string>
     <string name="copy_failed_invalid_image">Copia fallida: imagen inválida</string>
     <string name="failed_to_copy_image">Error al copiar la imagen</string>
