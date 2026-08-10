@@ -376,3 +376,104 @@ observer.observe(document.body, { childList: true, subtree: true });
             .observe(meta, { attributes: true, attributeFilter: ['content'] });
     }
 })();
+
+// Image load fix for media viewer
+(function() {
+  const processedImages = new WeakSet();
+  const seenKeys = new WeakMap();
+
+  const keyOf = (img) => (img.currentSrc || img.src || "") + "|" + (img.getAttribute("srcset") || "");
+
+  const forceRepaint = (img) => {
+    if (img.complete && img.naturalWidth > 0) return;
+    const parent = img.parentElement;
+    if (!parent) return;
+    const original = parent.style.display;
+    parent.style.display = "none";
+    void parent.offsetHeight;
+    parent.style.display = original;
+    if (!original) parent.style.removeProperty("display");
+  };
+
+  const processImage = (img) => {
+    if (!(img instanceof HTMLImageElement)) return;
+    const key = keyOf(img);
+    if (seenKeys.has(img) && seenKeys.get(img) === key) return;
+    seenKeys.set(img, key);
+    img.loading = "eager";
+    img.decode = img.decode || null;
+    if (img.decode) {
+      img.decode()
+        .then(() => forceRepaint(img))
+        .catch(() => forceRepaint(img));
+    } else {
+      forceRepaint(img);
+    }
+    img.addEventListener(
+      "load",
+      () => forceRepaint(img),
+      { once: true }
+    );
+    img.addEventListener(
+      "error",
+      () => forceRepaint(img),
+      { once: true }
+    );
+  };
+
+  const scanDialog = () => {
+    const dialog = document.querySelector('div[role="dialog"]');
+    if (!dialog) return;
+    const images = dialog.querySelectorAll('img[src*="fbcdn"]');
+    for (const img of images) {
+      processImage(img);
+      processedImages.add(img);
+    }
+  };
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches && node.matches('div[role="dialog"]')) {
+          scanDialog();
+          return;
+        }
+        if (node.querySelector) {
+          const dialog = node.matches && node.matches('div[role="dialog"]')
+            ? node
+            : node.querySelector('div[role="dialog"]');
+          if (dialog) {
+            scanDialog();
+            return;
+          }
+        }
+      }
+      if (mutation.type === "attributes" && mutation.target.tagName === "IMG") {
+        processImage(mutation.target);
+      }
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "srcset"]
+  });
+
+  let rescanTimer = null;
+  const scheduleRescan = () => {
+    if (rescanTimer) return;
+    rescanTimer = setTimeout(() => {
+      rescanTimer = null;
+      if (document.querySelector('div[role="dialog"]')) {
+        scanDialog();
+        scheduleRescan();
+      }
+    }, 1500);
+  };
+
+  scanDialog();
+  scheduleRescan();
+})();

@@ -13,6 +13,7 @@
     <string name="network_error_description">使用 Materialbook 前，請開啟行動數據或連接 Wi-Fi。</string>
     <string name="ok">確定</string>
     <string name="saved_to_downloads">已儲存至下載</string>
+    <string name="text_copied_to_clipboard">文字已複製到剪貼簿</string>
     <string name="download_failed_invalid_data">下載失敗：資料無效</string>
     <string name="failed_to_save_file">儲存檔案失敗</string>
     <string name="suggested_posts">推薦貼文</string>

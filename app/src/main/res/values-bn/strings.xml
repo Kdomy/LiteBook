@@ -13,6 +13,7 @@
     <string name="network_error_description">Materialbook ব্যবহার করতে, মোবাইল ডেটা চালু করুন বা Wi-Fi এ সংযুক্ত হোন।</string>
     <string name="ok">ঠিক আছে</string>
     <string name="saved_to_downloads">ডাউনলোডে সংরক্ষিত</string>
+    <string name="text_copied_to_clipboard">টেক্সট ক্লিপবোর্ডে কপি হয়েছে</string>
     <string name="download_failed_invalid_data">ডাউনলোড ব্যর্থ: অবৈধ ডেটা</string>
     <string name="failed_to_save_file">ফাইল সংরক্ষণ ব্যর্থ</string>
     <string name="suggested_posts">প্রস্তাবিত পোস্ট</string>
