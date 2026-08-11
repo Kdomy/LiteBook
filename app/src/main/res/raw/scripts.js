@@ -379,13 +379,11 @@ observer.observe(document.body, { childList: true, subtree: true });
 
 // Image load fix for media viewer
 (function() {
-  const processedImages = new WeakSet();
   const seenKeys = new WeakMap();
 
   const keyOf = (img) => (img.currentSrc || img.src || "") + "|" + (img.getAttribute("srcset") || "");
 
-  const forceRepaint = (img) => {
-    if (img.complete && img.naturalWidth > 0) return;
+  const repaintImage = (img) => {
     const parent = img.parentElement;
     if (!parent) return;
     const original = parent.style.display;
@@ -393,6 +391,32 @@ observer.observe(document.body, { childList: true, subtree: true });
     void parent.offsetHeight;
     parent.style.display = original;
     if (!original) parent.style.removeProperty("display");
+    const prevVisibility = img.style.visibility;
+    img.style.visibility = "hidden";
+    void img.offsetWidth;
+    img.style.visibility = prevVisibility;
+    if (!prevVisibility) img.style.removeProperty("visibility");
+  };
+
+  const refreshLayer = (img) => {
+    const prevTransform = img.style.transform;
+    img.style.transform = "translateZ(0)";
+    void img.offsetWidth;
+    requestAnimationFrame(() => {
+      img.style.transform = prevTransform;
+      if (!prevTransform) img.style.removeProperty("transform");
+    });
+  };
+
+  const heal = (img) => {
+    if (img._fbHealed) return;
+    if (!(img.complete && img.naturalWidth > 0)) return;
+    img._fbHealed = true;
+    repaintImage(img);
+    refreshLayer(img);
+    setTimeout(() => {
+      if (img.isConnected) refreshLayer(img);
+    }, 800);
   };
 
   const processImage = (img) => {
@@ -401,33 +425,20 @@ observer.observe(document.body, { childList: true, subtree: true });
     if (seenKeys.has(img) && seenKeys.get(img) === key) return;
     seenKeys.set(img, key);
     img.loading = "eager";
-    img.decode = img.decode || null;
-    if (img.decode) {
-      img.decode()
-        .then(() => forceRepaint(img))
-        .catch(() => forceRepaint(img));
-    } else {
-      forceRepaint(img);
+    if (typeof img.decode === "function") {
+      img.decode().then(() => heal(img)).catch(() => heal(img));
     }
-    img.addEventListener(
-      "load",
-      () => forceRepaint(img),
-      { once: true }
-    );
-    img.addEventListener(
-      "error",
-      () => forceRepaint(img),
-      { once: true }
-    );
+    img.addEventListener("load", () => heal(img), { once: true });
+    img.addEventListener("error", () => heal(img), { once: true });
+    setTimeout(() => heal(img), 900);
   };
 
   const scanDialog = () => {
     const dialog = document.querySelector('div[role="dialog"]');
     if (!dialog) return;
-    const images = dialog.querySelectorAll('img[src*="fbcdn"]');
+    const images = dialog.querySelectorAll('img[src]');
     for (const img of images) {
       processImage(img);
-      processedImages.add(img);
     }
   };
 

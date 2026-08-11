@@ -79,9 +79,19 @@ fun MaterialbookWebView(
         }
     )
 
+    val initialUrl = rememberSaveable { mutableStateOf(url) }
+
     LaunchedEffect(navigator) {
-        val bundle = state.viewState
-        if (bundle == null) {
+        if (state.viewState == null) {
+            navigator.loadUrl(url)
+        } else {
+            navigator.reload()
+        }
+    }
+
+    LaunchedEffect(url) {
+        if (url != initialUrl.value) {
+            initialUrl.value = url
             navigator.loadUrl(url)
         }
     }
