@@ -1,3 +1,12 @@
+# LiteBook v2.0.1
+
+## Fixes
+
+- Regenerate the "LB" app icon with a bolder, cleaner Segoe UI Black monogram that is no longer clipped by launcher masks
+- Fix garbled "•" bullet shown on the loading splash screen
+
+---
+
 # LiteBook v2.0.0
 
 ## Rebranding
