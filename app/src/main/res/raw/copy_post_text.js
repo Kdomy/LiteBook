@@ -155,7 +155,10 @@
   };
 
   var onContextMenu = function(event) {
-    if (event.target && findPostContainer(event.target)) {
+    // Only block the long-press menu on plain post text. Interactive
+    // elements (Like button, links, menus) must keep the contextmenu event
+    // so Facebook's reaction picker (👍 ❤️ 😄 😮 😓 😠) still opens.
+    if (event.target && !isInteractive(event.target) && findPostContainer(event.target)) {
       event.preventDefault();
     }
   };
