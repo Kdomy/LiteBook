@@ -20,13 +20,22 @@
   // have a blob: video.src that cannot be fetched; the actual .mp4 URLs are
   // requested through fetch/XMLHttpRequest and are captured here.
   const capturedMediaUrls = [];
+  const videoUrlByElement = new Map();
+  let activeVideoEl = null;
   const MEDIA_URL_RE = /\.(mp4|m4v)(\?|$)/i;
 
   const captureMediaUrl = (u) => {
     if (typeof u === "string" && MEDIA_URL_RE.test(u)) {
       capturedMediaUrls.push(u);
       if (capturedMediaUrls.length > 50) capturedMediaUrls.shift();
+      if (activeVideoEl) videoUrlByElement.set(activeVideoEl, u);
     }
+  };
+
+  const originalPlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function() {
+    activeVideoEl = this;
+    return originalPlay.apply(this, arguments);
   };
 
   const originalFetch = window.fetch;
@@ -216,17 +225,19 @@
 
   // Resolve the real MP4 URL for a video element. Videos streamed through
   // MSE use a blob: src; the real .mp4 URL is captured from fetch/XHR while
-  // the video plays. If nothing has been captured yet, briefly play the
-  // video muted to force the network request, then restore its state.
+  // the video plays. Only URLs captured while THIS video element was active
+  // are trusted: the global capture list may hold stale URLs from previous
+  // videos, which would produce a file the user's player cannot open. If no
+  // URL has been captured yet, briefly play the video muted to force the
+  // network request, then restore its state.
   const resolveVideoUrl = (videoEl, done) => {
     if (!videoEl) return done(null);
 
     const src = videoEl.currentSrc || videoEl.src;
     if (src && !src.startsWith("blob:")) return done(src);
 
-    if (capturedMediaUrls.length > 0) {
-      return done(capturedMediaUrls[capturedMediaUrls.length - 1]);
-    }
+    const known = videoUrlByElement.get(videoEl);
+    if (known) return done(known);
 
     const wasPaused = videoEl.paused;
     const wasMuted = videoEl.muted;
@@ -245,11 +256,7 @@
           if (p && p.catch) p.catch(() => {});
         }
       } catch (e) {}
-      done(
-        capturedMediaUrls.length > 0
-          ? capturedMediaUrls[capturedMediaUrls.length - 1]
-          : null
-      );
+      done(videoUrlByElement.get(videoEl) || null);
     };
 
     try {
@@ -260,9 +267,8 @@
       return finish();
     }
 
-    const before = capturedMediaUrls.length;
     timer = setInterval(() => {
-      if (capturedMediaUrls.length > before) finish();
+      if (videoUrlByElement.get(videoEl)) finish();
     }, 150);
     setTimeout(finish, 4000);
   };
