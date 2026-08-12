@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Script to add copy to clipboard buttons for images on Facebook
  * Based on download_content.js
  */
@@ -14,7 +14,7 @@
   let isProcessing = false;
   let currentContentContainer = null;
   let lastCopiedUrl = null;
-  const COPY_BTN_ID = "materialbook-clipboard-copier";
+  const COPY_BTN_ID = "litebook-clipboard-copier";
 
   // Selectors for finding media content
   const SELECTORS = {

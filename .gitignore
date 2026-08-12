@@ -13,4 +13,8 @@ local.properties
 # Android build outputs
 /build/
 /app/build/
+/app/apk/
 *.apk
+
+# Local Gradle JVM config
+gradle/gradle-daemon-jvm.properties

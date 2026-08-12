@@ -1,4 +1,4 @@
-
+﻿
 // Desktop mode identifier
 (() => {
     window.isDesktopMode = () => {
@@ -15,7 +15,7 @@
         if (window.isDesktopMode()) return isHomeUrl;
 
         const hasSpecialButton = Array.from(document.querySelectorAll('[role="button"] span'))
-            .some(span => span.textContent === '󱥆');
+            .some(span => span.textContent === 'ó±¥†');
 
         return isHomeUrl && hasSpecialButton;
     };
@@ -274,7 +274,7 @@ observer.observe(document.body, { childList: true, subtree: true });
 })();
 
 
-/* The below scripts are specific to com.eepiemi.materialbook application. */
+/* The below scripts are specific to com.kdomy.litebook application. */
 
 (() => {
   const onReady = (fn) => {
@@ -302,7 +302,7 @@ observer.observe(document.body, { childList: true, subtree: true });
 
     const findInsertionPoint = () => {
       const iconSpan = Array.from(document.querySelectorAll('span'))
-        .find(span => span.textContent === '󱥊');
+        .find(span => span.textContent === 'ó±¥Š');
       const container = iconSpan?.closest('div[role="button"]')?.parentNode;
 
       const desktopTarget = document.querySelector(
