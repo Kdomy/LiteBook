@@ -67,7 +67,7 @@ fun SplashLoading(progress: Float) {
             )
             repeat(5) {
                 Text(
-                    text = "â€¢",
+                    text = "•",
                     fontSize = 40.sp,
                     color = if (progress >= it*0.20) progressColor else Color.DarkGray
                 )
