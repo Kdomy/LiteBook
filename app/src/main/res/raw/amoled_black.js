@@ -15,10 +15,26 @@
 
   function detectLightScreen() {
     if (window.isDesktopMode?.()) return false;
+    const hasBloks = document.querySelector('[class*="wbloks"]') !== null ||
+                     document.querySelector('[data-bloks-name]') !== null;
     const meta = document.querySelector('meta[name="theme-color"]');
     const content = meta?.getAttribute('content')?.toLowerCase().trim();
-    if (content === '#ffffff' || content === '#3b5998' || content === '#f0f2f5') return true;
+    if (hasBloks && (content === '#ffffff' || content === '#3b5998' || content === '#f0f2f5')) return true;
     return /(\/login\/?|\/cookie\/|consent\.redirect|onboard)/i.test((location.pathname || '') + (location.search || ''));
+  }
+
+  function isOnLightBackground(el) {
+    let node = el;
+    while (node) {
+      const bg = getComputedStyle(node).backgroundColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (bg) {
+        const [br, bgg, bb] = bg.slice(1).map(Number);
+        if (br === 0 && bgg === 0 && bb === 0) { node = node.parentElement; continue; }
+        return 0.299 * br + 0.587 * bgg + 0.114 * bb > 128;
+      }
+      node = node.parentElement;
+    }
+    return false;
   }
 
   function lightenLoginText() {
@@ -28,11 +44,7 @@
       if (el.childElementCount > 0 && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden') return;
-      const bg = cs.backgroundColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-      if (bg) {
-        const [br, bgg, bb] = bg.slice(1).map(Number);
-        if (0.299 * br + 0.587 * bgg + 0.114 * bb > 128) return;
-      }
+      if (isOnLightBackground(el)) return;
       const m = cs.color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
       if (!m) return;
       const [r, g, b] = m.slice(1).map(Number);
