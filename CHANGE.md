@@ -1,3 +1,14 @@
+# LiteBook v2.0.2
+
+## Fixes
+
+- Download the actual video instead of the poster image when the video is paused (stories, reels)
+- Fix garbled accents (cp1252 mojibake) in translations across all languages
+- Fix navigation through `lm.facebook.com/l.php` redirect links
+- Keep Facebook's long-press reaction picker (👍 ❤️ 😄 😮 😓 😠) working on buttons
+
+---
+
 # LiteBook v2.0.1
 
 ## Fixes
