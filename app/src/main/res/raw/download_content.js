@@ -177,6 +177,110 @@
     return false;
   };
 
+  // Find the current video element, even when it is covered by its poster
+  // image (paused videos) or sits inside the story/reel viewer.
+  const findVideoInView = () => {
+    const candidates = Array.from(document.querySelectorAll("video"));
+    const visible = candidates.filter(el => isElementVisible(el));
+    const pool = visible.length > 0 ? visible : candidates;
+
+    const viewerSelectors = [
+      'div[role="dialog"]',
+      'div[data-pagelet="Story"]',
+      'div[data-pagelet="ReelViewer"]',
+      'div[aria-label*="story"]',
+      'div[aria-label*="reel"]',
+      'div.x1ey2m1c.x9f619.xds687c.x17qophe.x10l6tqk.x13vifvy[role="presentation"]'
+    ];
+
+    for (const selector of viewerSelectors) {
+      const container = document.querySelector(selector);
+      if (!container) continue;
+      const videos = container.querySelectorAll("video");
+      for (const video of videos) {
+        if (isElementVisible(video)) return video;
+      }
+      if (videos.length === 1) return videos[0];
+    }
+
+    if (currentContentContainer) {
+      const videos = currentContentContainer.querySelectorAll("video");
+      for (const video of videos) {
+        if (isElementVisible(video)) return video;
+      }
+      if (videos.length === 1) return videos[0];
+    }
+
+    return pool.length === 1 ? pool[0] : null;
+  };
+
+  // Resolve the real MP4 URL for a video element. Videos streamed through
+  // MSE use a blob: src; the real .mp4 URL is captured from fetch/XHR while
+  // the video plays. If nothing has been captured yet, briefly play the
+  // video muted to force the network request, then restore its state.
+  const resolveVideoUrl = (videoEl, done) => {
+    if (!videoEl) return done(null);
+
+    const src = videoEl.currentSrc || videoEl.src;
+    if (src && !src.startsWith("blob:")) return done(src);
+
+    if (capturedMediaUrls.length > 0) {
+      return done(capturedMediaUrls[capturedMediaUrls.length - 1]);
+    }
+
+    const wasPaused = videoEl.paused;
+    const wasMuted = videoEl.muted;
+    let finished = false;
+    let timer = null;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearInterval(timer);
+      try {
+        if (!videoEl.paused) videoEl.pause();
+        videoEl.muted = wasMuted;
+        if (!wasPaused) {
+          const p = videoEl.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+      } catch (e) {}
+      done(
+        capturedMediaUrls.length > 0
+          ? capturedMediaUrls[capturedMediaUrls.length - 1]
+          : null
+      );
+    };
+
+    try {
+      videoEl.muted = true;
+      const p = videoEl.play();
+      if (p && p.catch) p.catch(() => finish());
+    } catch (e) {
+      return finish();
+    }
+
+    const before = capturedMediaUrls.length;
+    timer = setInterval(() => {
+      if (capturedMediaUrls.length > before) finish();
+    }, 150);
+    setTimeout(finish, 4000);
+  };
+
+  const downloadVideo = (videoEl) => {
+    resolveVideoUrl(videoEl, (url) => {
+      if (!url) {
+        debugLog("No downloadable video URL found");
+        return;
+      }
+      if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
+        window.DownloadBridge.downloadUrl(url, "video/mp4");
+      } else {
+        downloadBase64(url, "video/mp4");
+      }
+    });
+  };
+
   // Download media from URL
   const downloadMedia = (url) => {
     if (!url || typeof url !== "string") return;
@@ -230,23 +334,24 @@
 
   // Extract and download videos or images
   const extractAndDownloadMedia = () => {
-    // Find current media element
-    const mediaElement = getCurrentMediaElement();
-
-    if (mediaElement && mediaElement.src && mediaElement.src !== lastDownloadedUrl) {
-      downloadMedia(mediaElement.src);
-      lastDownloadedUrl = mediaElement.src;
+    // Videos take priority: a paused video is covered by its poster image,
+    // so try to resolve the real video source first.
+    const videoElement = findVideoInView();
+    if (videoElement && videoElement.src !== lastDownloadedUrl) {
+      downloadVideo(videoElement);
+      lastDownloadedUrl = videoElement.src;
       return;
     }
 
     // Get container to search in
     const container = currentContentContainer || document.body;
 
-    // Find videos first
-    const videoElement = container.querySelector("video:not([hidden])");
-    if (videoElement && videoElement.src && videoElement.src !== lastDownloadedUrl) {
-      downloadMedia(videoElement.src);
-      lastDownloadedUrl = videoElement.src;
+    // Find current media element (image fallback)
+    const mediaElement = getCurrentMediaElement();
+
+    if (mediaElement && mediaElement.src && mediaElement.src !== lastDownloadedUrl) {
+      downloadMedia(mediaElement.src);
+      lastDownloadedUrl = mediaElement.src;
       return;
     }
 
