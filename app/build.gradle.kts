@@ -1,4 +1,4 @@
-import com.android.build.api.dsl.ApplicationExtension
+﻿import com.android.build.api.dsl.ApplicationExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -14,15 +14,15 @@ kotlin {
 }
 
 extensions.configure<ApplicationExtension> {
-    namespace = "com.eepiemi.materialbook"
+    namespace = "com.kdomy.litebook"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kdomy.litebook"
         minSdk = 23
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.0.0"
+        versionCode = 14
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

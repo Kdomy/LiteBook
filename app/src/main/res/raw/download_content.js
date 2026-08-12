@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Script to add download buttons for stories, stories highlights and reels on Facebook
  * Original Author: @YeiversonYurgaky
  */
@@ -14,7 +14,7 @@
   let isProcessing = false;
   let currentContentContainer = null;
   let lastDownloadedUrl = null;
-  const DOWNLOAD_BTN_ID = "materialbook-global-downloader";
+  const DOWNLOAD_BTN_ID = "litebook-global-downloader";
 
   // Capture real media URLs from the network. Videos streamed through MSE
   // have a blob: video.src that cannot be fetched; the actual .mp4 URLs are
@@ -403,12 +403,12 @@
         const buttons = root.querySelectorAll('div[role="button"]');
 
         buttons.forEach(button => {
-          // Check if it contains div.fl.ac with a span containing the 󱥬 symbol
+          // Check if it contains div.fl.ac with a span containing the ó±¥¬ symbol
           const flAcDiv = button.querySelector('div.fl.ac');
 
           if (flAcDiv) {
             const span = flAcDiv.querySelector('span');
-            if (span && span.textContent.includes('󱥬')) {
+            if (span && span.textContent.includes('ó±¥¬')) {
               button.style.display = 'none';
             }
           }

@@ -1,27 +1,25 @@
 <p align="middle">
-    <img src='./fastlane/metadata/android/en-US/images/featureGraphic.png' alt="Materialbook banner" width="100%">
+    <img src='./fastlane/metadata/android/en-US/images/featureGraphic.png' alt="LiteBook banner" width="100%">
 </p>
 
 <h1 align="middle">
-    📱 Download 
+    📱 Download
 </h1>
 
 <p align="middle">
-    <a href='https://github.com/eepiemi/Materialbook/releases/latest'><img alt='Download' height='40' src='./assets/download.svg'/></a>
-    <a href='https://grev.shehryar.ae/?owner=eepiemi&repo=Materialbook'><img alt='Downloads count' height='40' src='https://downloads-count.eepiemi.workers.dev'/></a>
+    <a href='https://github.com/Kdomy/LiteBook/releases/latest'><img alt='Download' height='40' src='./assets/download.svg'/></a>
 </p>
 
 <h2 align="middle">
-    🙋 Have issues? Enjoy the app? ☕
+    🙋 Have issues? Enjoy the app?
 </h2>
 
 <p align="middle">
-    <a href='https://github.com/eepiemi/Materialbook/issues/new/choose'><img alt='Open issue' height='40' src='./assets/open_issue.svg'/></a>
-    <a href='https://buymeacoffee.com/eepiemi'><img alt='Buy me a coffee!' height='40' src='./assets/buy_me_a_coffee.svg'/></a>
+    <a href='https://github.com/Kdomy/LiteBook/issues/new/choose'><img alt='Open issue' height='40' src='./assets/open_issue.svg'/></a>
 </p>
 
 <h2 align="middle">
-    ✏️ This fork:
+    ✏️ About this fork:
 </h2>
 
 *  Implements Material You theming for:
@@ -32,6 +30,7 @@
 *  Fixes AMOLED Black
 *  Makes the splash screen and the "No internet" screen AMOLED Black
 *  Changes some minor things for aesthetics purposes
+*  Adds a lightweight local version of the enhancement scripts
 
 <h2 align="middle">
     ⚙️ Features
@@ -58,11 +57,11 @@ If enabled, the app:
 1.  **Clone the repository**
     * In Android Studio:
       * File > New > Project from Version Control
-      * Paste `https://github.com/eepiemi/Materialbook.git` and clone.
+      * Paste `https://github.com/Kdomy/LiteBook.git` and clone.
     * Or via terminal: 
     ```
-    git clone https://github.com/eepiemi/Materialbook.git
-    cd Materialbook
+    git clone https://github.com/Kdomy/LiteBook.git
+    cd LiteBook
     ``` 
 2.  **Open in Android Studio.** (only if cloned via terminal)
     * Select Open an Existing Project and choose the cloned folder.
@@ -73,4 +72,4 @@ If enabled, the app:
     💗 Acknowledgement:
 </h2>
 
-*  [@KevinnZou/compose-webview-multiplatform](https://github.com/KevinnZou/compose-webview-multiplatform)  
+*  [@KevinnZou/compose-webview-multiplatform](https://github.com/KevinnZou/compose-webview-multiplatform)
