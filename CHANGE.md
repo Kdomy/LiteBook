@@ -1,3 +1,11 @@
+# LiteBook v2.0.3
+
+## Fixes
+
+- Download the correct, complete video file: the real URL is now tied to the video element that actually plays, instead of reusing a possibly stale URL from a previous video (which produced files the player could not open)
+
+---
+
 # LiteBook v2.0.2
 
 ## Fixes
