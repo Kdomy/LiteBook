@@ -17,10 +17,11 @@ class ExternalRequestInterceptor(
         val internalUrlRegex = Regex(
             """https?://(?!(?:l|lm)\.)[^/]*(?:facebook|messenger)\.com/.*"""
         )
-        return if (internalUrlRegex.containsMatchIn(request.url) && request.isForMainFrame) {
+        val sanitizedUrl = fbRedirectSanitizer(request.url)
+        return if (internalUrlRegex.containsMatchIn(sanitizedUrl) && request.isForMainFrame) {
             WebRequestInterceptResult.Allow
         } else {
-            handleExternalUrl(fbRedirectSanitizer(request.url))
+            handleExternalUrl(sanitizedUrl)
             WebRequestInterceptResult.Reject
         }
     }
