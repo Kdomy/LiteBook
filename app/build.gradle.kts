@@ -21,8 +21,8 @@ extensions.configure<ApplicationExtension> {
         applicationId = "com.kdomy.litebook"
         minSdk = 23
         targetSdk = 36
-        versionCode = 17
-        versionName = "2.0.3"
+        versionCode = 18
+        versionName = "2.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

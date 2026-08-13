@@ -28,7 +28,13 @@
     if (typeof u === "string" && MEDIA_URL_RE.test(u)) {
       capturedMediaUrls.push(u);
       if (capturedMediaUrls.length > 50) capturedMediaUrls.shift();
-      if (activeVideoEl) videoUrlByElement.set(activeVideoEl, u);
+      if (activeVideoEl) {
+        videoUrlByElement.set(activeVideoEl, {
+          url: u,
+          src: activeVideoEl.currentSrc || activeVideoEl.src,
+          at: Date.now()
+        });
+      }
     }
   };
 
@@ -186,12 +192,54 @@
     return false;
   };
 
+  // True when the current page/view is actually showing video (reel, story,
+  // watch, or a viewer dialog that contains a VISIBLE <video>). Facebook keeps
+  // stale video elements and whole viewers (hidden or offscreen) in the DOM
+  // after you leave a video; on a photo view the downloader must never pick
+  // those up, or a photo download would return the previous video.
+  const isInVideoView = () => {
+    const url = window.location.href;
+    if (
+      url.includes("/reel/") ||
+      url.includes("/reels") ||
+      url.includes("/watch") ||
+      url.includes("/videos/") ||
+      url.includes("/story.php") ||
+      url.includes("/stories/")
+    ) {
+      return true;
+    }
+    const videoViewers = [
+      'div[role="dialog"]',
+      'div[data-pagelet="Story"]',
+      'div[data-pagelet="ReelViewer"]',
+      'div.x1ey2m1c.x9f619.xds687c.x17qophe.x10l6tqk.x13vifvy[role="presentation"]'
+    ];
+    for (const selector of videoViewers) {
+      const container = document.querySelector(selector);
+      if (!container) continue;
+      const videos = container.querySelectorAll("video:not([hidden])");
+      for (const video of videos) {
+        if (isElementVisible(video)) return true;
+      }
+    }
+    return false;
+  };
+
   // Find the current video element, even when it is covered by its poster
-  // image (paused videos) or sits inside the story/reel viewer.
+  // image (paused videos) or sits inside the story/reel viewer. Only videos
+  // that are genuinely in view can be selected: a stale (hidden or offscreen)
+  // <video> left in the DOM by Facebook must never win over the photo the user
+  // is actually looking at.
   const findVideoInView = () => {
-    const candidates = Array.from(document.querySelectorAll("video"));
-    const visible = candidates.filter(el => isElementVisible(el));
-    const pool = visible.length > 0 ? visible : candidates;
+    if (!isInVideoView()) return null;
+
+    const visible = Array.from(
+      document.querySelectorAll("video:not([hidden])")
+    ).filter(el => isElementVisible(el));
+
+    if (visible.length === 0) return null;
+    if (visible.length === 1) return visible[0];
 
     const viewerSelectors = [
       'div[role="dialog"]',
@@ -201,26 +249,43 @@
       'div[aria-label*="reel"]',
       'div.x1ey2m1c.x9f619.xds687c.x17qophe.x10l6tqk.x13vifvy[role="presentation"]'
     ];
-
     for (const selector of viewerSelectors) {
       const container = document.querySelector(selector);
       if (!container) continue;
-      const videos = container.querySelectorAll("video");
-      for (const video of videos) {
-        if (isElementVisible(video)) return video;
-      }
-      if (videos.length === 1) return videos[0];
+      const inViewer = visible.find(v => v.closest && v.closest(selector));
+      if (inViewer) return inViewer;
     }
+    return null;
+  };
 
-    if (currentContentContainer) {
-      const videos = currentContentContainer.querySelectorAll("video");
-      for (const video of videos) {
-        if (isElementVisible(video)) return video;
-      }
-      if (videos.length === 1) return videos[0];
+  // Return the URL captured for this video element, only if it still matches
+  // the source the element is currently playing. Facebook reuses one <video>
+  // element across reels, so an entry keyed only by element can be stale (an
+  // expired signed URL that Facebook answers with an HTML page instead of
+  // video, hence an unreadable file).
+  const knownUrlFor = (videoEl) => {
+    if (!videoEl) return null;
+    const known = videoUrlByElement.get(videoEl);
+    if (!known) return null;
+    const src = videoEl.currentSrc || videoEl.src;
+    if (known.src === src) return known.url;
+    return null;
+  };
+
+  // Facebook's media URLs carry MSE range query params (bytestart/byteend)
+  // that describe one buffering chunk. Downloading such a URL would save only
+  // that chunk: a truncated, unreadable file. Strip them so the whole file is
+  // served.
+  const sanitizeVideoUrl = (u) => {
+    if (!u) return u;
+    try {
+      const parsed = new URL(u);
+      const rangeParams = ["bytestart", "byteend", "rb", "range", "start", "end"];
+      for (const key of rangeParams) parsed.searchParams.delete(key);
+      return parsed.toString();
+    } catch (e) {
+      return u;
     }
-
-    return pool.length === 1 ? pool[0] : null;
   };
 
   // Resolve the real MP4 URL for a video element. Videos streamed through
@@ -236,7 +301,7 @@
     const src = videoEl.currentSrc || videoEl.src;
     if (src && !src.startsWith("blob:")) return done(src);
 
-    const known = videoUrlByElement.get(videoEl);
+    const known = knownUrlFor(videoEl);
     if (known) return done(known);
 
     const wasPaused = videoEl.paused;
@@ -256,7 +321,7 @@
           if (p && p.catch) p.catch(() => {});
         }
       } catch (e) {}
-      done(videoUrlByElement.get(videoEl) || null);
+      done(knownUrlFor(videoEl));
     };
 
     try {
@@ -268,7 +333,7 @@
     }
 
     timer = setInterval(() => {
-      if (videoUrlByElement.get(videoEl)) finish();
+      if (knownUrlFor(videoEl)) finish();
     }, 150);
     setTimeout(finish, 4000);
   };
@@ -280,15 +345,17 @@
         return;
       }
       if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
-        window.DownloadBridge.downloadUrl(url, "video/mp4");
+        window.DownloadBridge.downloadUrl(sanitizeVideoUrl(url), "video/mp4");
       } else {
-        downloadBase64(url, "video/mp4");
+        downloadBase64(sanitizeVideoUrl(url), "video/mp4");
       }
     });
   };
 
-  // Download media from URL
-  const downloadMedia = (url) => {
+  // Download media from URL. mediaElement is the element the URL came from,
+  // used to resolve blob: video sources to the URL captured for that element
+  // (never a global, possibly stale, last-captured URL).
+  const downloadMedia = (url, mediaElement) => {
     if (!url || typeof url !== "string") return;
 
     const isVideo = /\.(mp4|m4v)(\?|$)/i.test(url) || url.startsWith("blob:");
@@ -296,7 +363,7 @@
     if (isVideo) {
       let realUrl = url;
       if (url.startsWith("blob:")) {
-        realUrl = capturedMediaUrls[capturedMediaUrls.length - 1] || null;
+        realUrl = knownUrlFor(mediaElement) || null;
       }
 
       if (!realUrl) {
@@ -306,9 +373,9 @@
 
       if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
         // Stream the file natively to avoid loading large videos in memory.
-        window.DownloadBridge.downloadUrl(realUrl, "video/mp4");
+        window.DownloadBridge.downloadUrl(sanitizeVideoUrl(realUrl), "video/mp4");
       } else {
-        downloadBase64(realUrl, "video/mp4");
+        downloadBase64(sanitizeVideoUrl(realUrl), "video/mp4");
       }
       return;
     }
@@ -340,8 +407,25 @@
 
   // Extract and download videos or images
   const extractAndDownloadMedia = () => {
-    // Videos take priority: a paused video is covered by its poster image,
-    // so try to resolve the real video source first.
+    // Prefer the media in the CURRENT viewer: what the user is actually
+    // looking at decides photo vs video. On a photo dialog this is the photo;
+    // on a reel/story viewer it is the <video> (even when paused and covered
+    // by its poster image).
+    const mediaElement = getCurrentMediaElement();
+
+    if (mediaElement && mediaElement.src && mediaElement.src !== lastDownloadedUrl) {
+      if (mediaElement.tagName === "VIDEO") {
+        downloadVideo(mediaElement);
+      } else {
+        downloadMedia(mediaElement.src, mediaElement);
+      }
+      lastDownloadedUrl = mediaElement.src;
+      return;
+    }
+
+    // Fallback: a page-wide video, but only when a video is genuinely in view
+    // (isInVideoView). This keeps a stale <video> element left in the DOM by
+    // Facebook from hijacking a photo download.
     const videoElement = findVideoInView();
     if (videoElement && videoElement.src !== lastDownloadedUrl) {
       downloadVideo(videoElement);
@@ -351,15 +435,6 @@
 
     // Get container to search in
     const container = currentContentContainer || document.body;
-
-    // Find current media element (image fallback)
-    const mediaElement = getCurrentMediaElement();
-
-    if (mediaElement && mediaElement.src && mediaElement.src !== lastDownloadedUrl) {
-      downloadMedia(mediaElement.src);
-      lastDownloadedUrl = mediaElement.src;
-      return;
-    }
 
     // If no video, try with images
     const images = Array.from(container.querySelectorAll("img"))

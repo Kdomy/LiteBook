@@ -1,3 +1,14 @@
+# LiteBook v2.0.4
+
+## Fixes
+
+- Fix photos in the media viewer loading only halfway: the image is now re-decoded after load, and viewer images are kept out of their own GPU layer (transforms/zoom still work)
+- Fix long-press post copy dropping formatting: line breaks, blank lines, indentation and spacing are now preserved
+- Fix downloading a photo sometimes returning the previous video: a stale <video> element left in the DOM by Facebook no longer hijacks the download, and an expired captured video URL is refused
+- Fix reels/photo downloads reusing a cached URL from an earlier video (unreadable file)
+
+---
+
 # LiteBook v2.0.3
 
 ## Fixes

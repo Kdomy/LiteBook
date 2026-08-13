@@ -64,8 +64,20 @@ class DownloadBridge(private val context: Context) {
                     }
 
                     val contentType = connection.contentType
+
+                    // Refuse to save a response that is not actual media: an
+                    // expired/stale signed URL is answered with an HTML page,
+                    // which would otherwise be saved as a .mp4 the player
+                    // cannot open.
+                    if (contentType == null ||
+                        contentType.startsWith("text/") ||
+                        contentType.contains("html")
+                    ) {
+                        throw IOException("Response is not media content")
+                    }
+
                     val finalMimeType =
-                        if (contentType?.startsWith("video/") == true) contentType else mimeType
+                        if (contentType.startsWith("video/")) contentType else mimeType
                     val ext = MimeTypeMap.getSingleton()
                         .getExtensionFromMimeType(finalMimeType) ?: "mp4"
                     val fileName = "${System.currentTimeMillis()}.$ext"

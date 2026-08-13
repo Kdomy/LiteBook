@@ -32,15 +32,16 @@
   var pressStartY = 0;
   var pressTarget = null;
 
+  // Preserve the post's formatting: line breaks (including blank lines),
+  // indentation and spacing are kept as-is. Only invisible characters and
+  // platform-specific line endings are normalized.
   var cleanText = function(raw) {
     if (!raw) return "";
     return raw
       .replace(/\u00a0/g, " ")
-      .split("\n")
-      .map(function(line) { return line.trim(); })
-      .filter(function(line) { return line.length > 0; })
-      .join("\n")
-      .replace(/[ \t]{2,}/g, " ")
+      .replace(/[\u200b\u200c\u200d]/g, "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
       .trim();
   };
 

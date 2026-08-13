@@ -383,62 +383,92 @@ observer.observe(document.body, { childList: true, subtree: true });
 
   const keyOf = (img) => (img.currentSrc || img.src || "") + "|" + (img.getAttribute("srcset") || "");
 
-  const repaintImage = (img) => {
-    const parent = img.parentElement;
-    if (!parent) return;
-    const original = parent.style.display;
-    parent.style.display = "none";
-    void parent.offsetHeight;
-    parent.style.display = original;
-    if (!original) parent.style.removeProperty("display");
-    const prevVisibility = img.style.visibility;
-    img.style.visibility = "hidden";
-    void img.offsetWidth;
-    img.style.visibility = prevVisibility;
-    if (!prevVisibility) img.style.removeProperty("visibility");
-  };
+  // When an image is promoted to its own composited layer (will-change,
+  // transitions), Android WebView can paint only the top part of a tall
+  // photo and never finishes the rest. Keep viewer images out of their own
+  // layer; transforms (pinch zoom) still work.
+  const style = document.createElement("style");
+  style.textContent = `
+    div[role="dialog"] img {
+      will-change: auto !important;
+    }
+  `;
+  document.head.appendChild(style);
 
-  const refreshLayer = (img) => {
-    const prevTransform = img.style.transform;
-    img.style.transform = "translateZ(0)";
-    void img.offsetWidth;
-    requestAnimationFrame(() => {
-      img.style.transform = prevTransform;
-      if (!prevTransform) img.style.removeProperty("transform");
-    });
-  };
-
-  const heal = (img) => {
-    if (img._fbHealed) return;
-    if (!(img.complete && img.naturalWidth > 0)) return;
-    img._fbHealed = true;
-    repaintImage(img);
-    refreshLayer(img);
+  // Force a fresh decode of the image. This reproduces what happens when the
+  // viewer is closed and reopened (which is what makes the photo finally
+  // appear complete), but in place. src is cleared and restored in the same
+  // task so the empty state is never painted, and the second decode is served
+  // from the image cache, producing a complete texture.
+  const reDecode = (img) => {
+    if (img._fbHealed || img._fbRedecoding) return;
+    const src = img.currentSrc || img.src;
+    if (!src || !img.complete || img.naturalWidth <= 0) return;
+    img._fbRedecoding = true;
     setTimeout(() => {
-      if (img.isConnected) refreshLayer(img);
-    }, 800);
+      img._fbRedecoding = false;
+      img._fbHealed = true;
+    }, 400);
+    img.src = "";
+    void img.offsetWidth;
+    img.src = src;
+  };
+
+  const isViewerImage = (img) => {
+    if (location.pathname.indexOf("/photo") === 0) return true;
+    const dialog = img.closest && img.closest('div[role="dialog"]');
+    if (!dialog) return false;
+    // In the video viewer the visible media is the <video>, not the poster
+    // image. Leave video viewers alone so the video element and the download
+    // capture logic are never disturbed.
+    if (dialog.querySelector && dialog.querySelector("video")) return false;
+    return true;
   };
 
   const processImage = (img) => {
     if (!(img instanceof HTMLImageElement)) return;
+    // Only the media viewer / photo page is affected by the partial render
+    // bug. Feed images re-decode on every src change and must be left alone.
+    if (!isViewerImage(img)) return;
     const key = keyOf(img);
     if (seenKeys.has(img) && seenKeys.get(img) === key) return;
     seenKeys.set(img, key);
     img.loading = "eager";
+    const heal = () => {
+      if (!img.isConnected) return;
+      if (!(img.complete && img.naturalWidth > 0)) return;
+      setTimeout(() => reDecode(img), 200);
+    };
     if (typeof img.decode === "function") {
-      img.decode().then(() => heal(img)).catch(() => heal(img));
+      img.decode().then(heal).catch(heal);
     }
-    img.addEventListener("load", () => heal(img), { once: true });
-    img.addEventListener("error", () => heal(img), { once: true });
-    setTimeout(() => heal(img), 900);
+    img.addEventListener("load", heal, { once: true });
+    img.addEventListener("error", heal, { once: true });
+    setTimeout(heal, 1200);
   };
 
-  const scanDialog = () => {
+  const scanViewer = () => {
     const dialog = document.querySelector('div[role="dialog"]');
-    if (!dialog) return;
-    const images = dialog.querySelectorAll('img[src]');
-    for (const img of images) {
-      processImage(img);
+    if (dialog) {
+      const images = dialog.querySelectorAll('img[src]');
+      for (const img of images) {
+        processImage(img);
+      }
+    }
+    // Full photo pages (photo.php) render the photo as a normal page element.
+    // Heal the largest visible photo so it only re-decodes that one image.
+    if (location.pathname.indexOf("/photo") === 0) {
+      const images = Array.from(document.querySelectorAll('img[src*="fbcdn"]'))
+        .filter((img) => {
+          const rect = img.getBoundingClientRect();
+          return rect.width > 300 && rect.height > 300;
+        })
+        .sort((a, b) => {
+          const areaA = a.getBoundingClientRect().width * a.getBoundingClientRect().height;
+          const areaB = b.getBoundingClientRect().width * b.getBoundingClientRect().height;
+          return areaB - areaA;
+        });
+      if (images[0]) processImage(images[0]);
     }
   };
 
@@ -447,7 +477,7 @@ observer.observe(document.body, { childList: true, subtree: true });
       for (const node of mutation.addedNodes) {
         if (node.nodeType !== 1) continue;
         if (node.matches && node.matches('div[role="dialog"]')) {
-          scanDialog();
+          scanViewer();
           return;
         }
         if (node.querySelector) {
@@ -455,7 +485,7 @@ observer.observe(document.body, { childList: true, subtree: true });
             ? node
             : node.querySelector('div[role="dialog"]');
           if (dialog) {
-            scanDialog();
+            scanViewer();
             return;
           }
         }
@@ -478,13 +508,13 @@ observer.observe(document.body, { childList: true, subtree: true });
     if (rescanTimer) return;
     rescanTimer = setTimeout(() => {
       rescanTimer = null;
-      if (document.querySelector('div[role="dialog"]')) {
-        scanDialog();
+      if (document.querySelector('div[role="dialog"]') || location.pathname.indexOf("/photo") === 0) {
+        scanViewer();
         scheduleRescan();
       }
     }, 1500);
   };
 
-  scanDialog();
+  scanViewer();
   scheduleRescan();
 })();
