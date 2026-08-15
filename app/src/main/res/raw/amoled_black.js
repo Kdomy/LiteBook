@@ -25,16 +25,30 @@
 
   function isOnLightBackground(el) {
     let node = el;
+    let sawLightOpaque = false;
     while (node) {
-      const bg = getComputedStyle(node).backgroundColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      const bg = getComputedStyle(node).backgroundColor.match(
+        /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/
+      );
       if (bg) {
-        const [br, bgg, bb] = bg.slice(1).map(Number);
-        if (br === 0 && bgg === 0 && bb === 0) { node = node.parentElement; continue; }
-        return 0.299 * br + 0.587 * bgg + 0.114 * bb > 128;
+        const [br, bgg, bb] = bg.slice(1, 4).map(Number);
+        const alpha = bg[4] !== undefined ? parseFloat(bg[4]) : 1;
+        // Fully transparent backgrounds carry no information: keep climbing.
+        if (alpha === 0) { node = node.parentElement; continue; }
+        const light = 0.299 * br + 0.587 * bgg + 0.114 * bb > 128;
+        // Any opaque dark background stops the climb and wins: dark text over
+        // it is unreadable and must be lightened.
+        if (!light) return false;
+        // An opaque LIGHT background (e.g. a white card) is remembered, but the
+        // climb continues: the login screen is a white card sitting on a dark
+        // page wash, so the OUTERMOST painted background decides. Stopping at
+        // the first white ancestor made the whole screen report "light" and
+        // left near-black text invisible over the black wash.
+        sawLightOpaque = true;
       }
       node = node.parentElement;
     }
-    return false;
+    return sawLightOpaque;
   }
 
   function lightenLoginText() {

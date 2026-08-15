@@ -17,6 +17,7 @@
     <string name="network_error_description">To use LiteBook, turn on mobile data or connect to Wi-Fi.</string>
     <string name="ok">OK</string>
     <string name="saved_to_downloads">Saved to Downloads</string>
+    <string name="saved_to_movies">Saved to Movies/LiteBook</string>
     <string name="download_failed_invalid_data">Download failed: Invalid data</string>
     <string name="failed_to_save_file">Failed to save file</string>
     <string name="image_copied_to_clipboard">Image copied to clipboard</string>

@@ -379,10 +379,6 @@ observer.observe(document.body, { childList: true, subtree: true });
 
 // Image load fix for media viewer
 (function() {
-  const seenKeys = new WeakMap();
-
-  const keyOf = (img) => (img.currentSrc || img.src || "") + "|" + (img.getAttribute("srcset") || "");
-
   // When an image is promoted to its own composited layer (will-change,
   // transitions), Android WebView can paint only the top part of a tall
   // photo and never finishes the rest. Keep viewer images out of their own
@@ -395,25 +391,6 @@ observer.observe(document.body, { childList: true, subtree: true });
   `;
   document.head.appendChild(style);
 
-  // Force a fresh decode of the image. This reproduces what happens when the
-  // viewer is closed and reopened (which is what makes the photo finally
-  // appear complete), but in place. src is cleared and restored in the same
-  // task so the empty state is never painted, and the second decode is served
-  // from the image cache, producing a complete texture.
-  const reDecode = (img) => {
-    if (img._fbHealed || img._fbRedecoding) return;
-    const src = img.currentSrc || img.src;
-    if (!src || !img.complete || img.naturalWidth <= 0) return;
-    img._fbRedecoding = true;
-    setTimeout(() => {
-      img._fbRedecoding = false;
-      img._fbHealed = true;
-    }, 400);
-    img.src = "";
-    void img.offsetWidth;
-    img.src = src;
-  };
-
   const isViewerImage = (img) => {
     if (location.pathname.indexOf("/photo") === 0) return true;
     const dialog = img.closest && img.closest('div[role="dialog"]');
@@ -425,35 +402,91 @@ observer.observe(document.body, { childList: true, subtree: true });
     return true;
   };
 
+  // Force a fresh GPU texture upload: a sub-pixel scale toggle re-rasterizes
+  // the element in place, which fixes the "bottom of a tall photo stays
+  // black" compositing glitch without touching the image source.
+  const nudgeRepaint = (el) => {
+    try {
+      el.style.webkitTransform = "scale(0.9999)";
+      void el.offsetWidth;
+      el.style.webkitTransform = "";
+    } catch (e) {}
+  };
+
+  // Clear and restore src in the same task: the empty state is never painted
+  // and the second decode is served from the image cache, producing a
+  // complete texture.
+  const reDecode = (img) => {
+    if (img._fbRedecoding) return;
+    const src = img.currentSrc || img.src;
+    if (!src || src.indexOf("data:") === 0) return;
+    if (!img.complete || img.naturalWidth <= 0) return;
+    img._fbRedecoding = true;
+    setTimeout(() => {
+      img._fbRedecoding = false;
+    }, 600);
+    img.src = "";
+    void img.offsetWidth;
+    img.src = src;
+  };
+
+  // Retry a few times: the first attempt can run while the browser is still
+  // decoding, so we nudge on every pass and re-decode once the image is
+  // definitely complete.
+  const heal = (img, attempt) => {
+    if (!img.isConnected) return;
+    if (attempt > 4) return;
+    setTimeout(() => {
+      if (!img.isConnected) return;
+      if (!(img.complete && img.naturalWidth > 0)) {
+        heal(img, attempt + 1);
+        return;
+      }
+      nudgeRepaint(img);
+      if (attempt === 1) reDecode(img);
+      heal(img, attempt + 1);
+    }, attempt === 0 ? 150 : 700);
+  };
+
   const processImage = (img) => {
     if (!(img instanceof HTMLImageElement)) return;
-    // Only the media viewer / photo page is affected by the partial render
-    // bug. Feed images re-decode on every src change and must be left alone.
     if (!isViewerImage(img)) return;
-    const key = keyOf(img);
-    if (seenKeys.has(img) && seenKeys.get(img) === key) return;
-    seenKeys.set(img, key);
     img.loading = "eager";
-    const heal = () => {
+    const start = () => {
       if (!img.isConnected) return;
-      if (!(img.complete && img.naturalWidth > 0)) return;
-      setTimeout(() => reDecode(img), 200);
+      if (!(img.complete && img.naturalWidth > 0)) {
+        setTimeout(start, 300);
+        return;
+      }
+      heal(img, 0);
     };
     if (typeof img.decode === "function") {
-      img.decode().then(heal).catch(heal);
+      img.decode().then(start).catch(start);
     }
-    img.addEventListener("load", heal, { once: true });
-    img.addEventListener("error", heal, { once: true });
-    setTimeout(heal, 1200);
+    img.addEventListener("load", start, { once: true });
+    img.addEventListener("error", start, { once: true });
+    setTimeout(start, 600);
+  };
+
+  // Facebook sometimes renders the viewer photo as a div with
+  // background-image. Nudge those too.
+  const processBackgrounds = (dialog) => {
+    const candidates = dialog.querySelectorAll('div[style*="background-image"]');
+    for (const el of candidates) {
+      if (el._fbNudged) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 200 || rect.height < 200) continue;
+      el._fbNudged = true;
+      setTimeout(() => nudgeRepaint(el), 300);
+    }
   };
 
   const scanViewer = () => {
     const dialog = document.querySelector('div[role="dialog"]');
     if (dialog) {
       const images = dialog.querySelectorAll('img[src]');
-      for (const img of images) {
-        processImage(img);
-      }
+      for (const img of images) processImage(img);
+      processBackgrounds(dialog);
     }
     // Full photo pages (photo.php) render the photo as a normal page element.
     // Heal the largest visible photo so it only re-decodes that one image.

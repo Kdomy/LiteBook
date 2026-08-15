@@ -24,16 +24,66 @@
   let activeVideoEl = null;
   const MEDIA_URL_RE = /\.(mp4|m4v)(\?|$)/i;
 
+  // Facebook streams reels as DASH: the audio and video tracks are separate
+  // .mp4 fragments, and the player also fetches a "progressive" (muxed) file
+  // that contains both. Downloading a single fragment yields a file with only
+  // sound or only image. Each captured URL is classified from its efg/tag
+  // query parameters so progressive (muxed) URLs win and audio-only fragments
+  // are discarded.
+  const decodeEfg = (u) => {
+    try {
+      const parsed = new URL(u);
+      const tag = parsed.searchParams.get("tag") || "";
+      let vtag = "";
+      const efg = parsed.searchParams.get("efg");
+      if (efg) {
+        try {
+          const json = JSON.parse(atob(efg.replace(/-/g, "+").replace(/_/g, "/")));
+          vtag = String(json.vencode_tag || json.v_encode_tag || "");
+        } catch (e) {}
+      }
+      return { tag, vtag };
+    } catch (e) {
+      return { tag: "", vtag: "" };
+    }
+  };
+
+  // "progressive" = muxed audio+video file (the ideal target),
+  // "video" = video-only DASH fragment, "audio" = audio-only DASH fragment,
+  // "unknown" = no classification info.
+  const classifyMediaUrl = (u) => {
+    const { tag, vtag } = decodeEfg(u);
+    const s = (vtag + " " + tag).toLowerCase();
+    if (s.includes("progressive") || s.includes("sve_") || s.includes("browser_native")) {
+      return "progressive";
+    }
+    if (s.includes("_audio") || s.includes("vbr3_audio")) return "audio";
+    if (s.includes("dash") || s.includes("baseline") || s.includes("h264") || s.includes("video")) {
+      return "video";
+    }
+    return "unknown";
+  };
+
   const captureMediaUrl = (u) => {
     if (typeof u === "string" && MEDIA_URL_RE.test(u)) {
-      capturedMediaUrls.push(u);
+      capturedMediaUrls.push({ url: u, at: Date.now() });
       if (capturedMediaUrls.length > 50) capturedMediaUrls.shift();
       if (activeVideoEl) {
-        videoUrlByElement.set(activeVideoEl, {
+        let list = videoUrlByElement.get(activeVideoEl);
+        if (!list) {
+          list = [];
+          videoUrlByElement.set(activeVideoEl, list);
+        }
+        list.push({
           url: u,
           src: activeVideoEl.currentSrc || activeVideoEl.src,
-          at: Date.now()
+          at: Date.now(),
+          kind: classifyMediaUrl(u)
         });
+        // Keep recent fragment URLs: a reel streams a separate video track
+        // and a separate audio track, and also a muxed "progressive" file.
+        // Candidates are re-ordered later so the progressive one wins.
+        if (list.length > 8) list.shift();
       }
     }
   };
@@ -67,6 +117,10 @@
     Object.defineProperty(HTMLMediaElement.prototype, "src", {
       get: mediaSrcDescriptor.get,
       set: function(value) {
+        // A new source (blob) means a new video is loading in this element;
+        // tie the following segment captures to it, even if play() is not
+        // called again (reel auto-advance).
+        if (typeof value === "string") activeVideoEl = this;
         captureMediaUrl(value);
         return mediaSrcDescriptor.set.call(this, value);
       },
@@ -82,6 +136,8 @@
       'div.x1ey2m1c.x9f619.xds687c.x17qophe.x10l6tqk.x13vifvy[role="presentation"] video',
       'div.x1ey2m1c.x9f619.xds687c.x17qophe.x10l6tqk.x13vifvy[role="presentation"] img[src*="fbcdn"]',
       'div[data-pagelet="Story"] video',
+      'div[data-pagelet="ReelViewer"] video:not([hidden])',
+      'div[data-pagelet="ReelViewer"] img[src*="fbcdn"]',
       'div[aria-label*="reel"] video',
       'div[data-pagelet="ProfilePhoto"] img[src*="fbcdn"]'
     ],
@@ -259,17 +315,71 @@
   };
 
   // Return the URL captured for this video element, only if it still matches
-  // the source the element is currently playing. Facebook reuses one <video>
-  // element across reels, so an entry keyed only by element can be stale (an
-  // expired signed URL that Facebook answers with an HTML page instead of
-  // video, hence an unreadable file).
+  // the source the element is currently playing AND was captured recently.
+  // Facebook reuses one <video> element across reels, so an entry keyed only
+  // by element can be stale (an expired signed URL that Facebook answers with
+  // an HTML page instead of video, hence an unreadable file).
   const knownUrlFor = (videoEl) => {
     if (!videoEl) return null;
-    const known = videoUrlByElement.get(videoEl);
-    if (!known) return null;
+    const list = videoUrlByElement.get(videoEl);
+    if (!list || list.length === 0) return null;
     const src = videoEl.currentSrc || videoEl.src;
-    if (known.src === src) return known.url;
-    return null;
+    const recent = list.filter(
+      (e) => e.src === src && Date.now() - e.at < 30000
+    );
+    if (recent.length === 0) return null;
+    recent.sort((a, b) => b.at - a.at);
+    return recent[0].url;
+  };
+
+  // Candidate URLs for a video element, grouped by kind. Reel videos are
+  // streamed as separate video/audio DASH fragments (no muxed file is fetched
+  // on mobile), so the bridge receives both fragments and merges them with a
+  // muxer to produce a file with image AND sound. A captured "progressive"
+  // (muxed) URL would be perfect and is kept separately: it is preferred when
+  // present. Audio-only fragments alone would produce a file with sound but no
+  // image, and video-only ones a file with image but no sound; the two must be
+  // combined.
+  const candidatesFor = (videoEl) => {
+    const buckets = { progressive: [], unknown: [], video: [], audio: [] };
+    const seen = new Set();
+    const push = (u, kind) => {
+      if (typeof u !== "string" || seen.has(u)) return;
+      seen.add(u);
+      buckets[kind].push(u);
+    };
+
+    const src = videoEl.currentSrc || videoEl.src;
+    if (src && !src.startsWith("blob:")) push(src, classifyMediaUrl(src));
+
+    const list = videoUrlByElement.get(videoEl);
+    if (list) {
+      const recent = list
+        .filter((e) => e.src === src && Date.now() - e.at < 60000)
+        .sort((a, b) => b.at - a.at);
+      recent.forEach((e) => push(e.url, e.kind));
+    }
+
+    // The muxed URL is not always requested against the active element's
+    // fetch chain, so also pull recent captures from the global pool.
+    const globalRecent = capturedMediaUrls
+      .filter((e) => Date.now() - e.at < 60000)
+      .sort((a, b) => b.at - a.at);
+    globalRecent.forEach((e) => push(e.url, classifyMediaUrl(e.url)));
+
+    for (const k of Object.keys(buckets)) buckets[k] = buckets[k].slice(0, 3);
+    return buckets;
+  };
+
+  const sendCandidates = (videoEl) => {
+    const buckets = candidatesFor(videoEl);
+    const payload = {
+      progressive: buckets.progressive.map(sanitizeVideoUrl),
+      unknown: buckets.unknown.map(sanitizeVideoUrl),
+      video: buckets.video.map(sanitizeVideoUrl),
+      audio: buckets.audio.map(sanitizeVideoUrl)
+    };
+    window.DownloadBridge.downloadUrl(JSON.stringify(payload), "video/mp4");
   };
 
   // Facebook's media URLs carry MSE range query params (bytestart/byteend)
@@ -290,11 +400,10 @@
 
   // Resolve the real MP4 URL for a video element. Videos streamed through
   // MSE use a blob: src; the real .mp4 URL is captured from fetch/XHR while
-  // the video plays. Only URLs captured while THIS video element was active
-  // are trusted: the global capture list may hold stale URLs from previous
-  // videos, which would produce a file the user's player cannot open. If no
-  // URL has been captured yet, briefly play the video muted to force the
-  // network request, then restore its state.
+  // the video plays. Priority: the URL captured for this element while it
+  // played its current source, then force a fresh network request by seeking
+  // near the end and back (the buffered video requests a new segment whose
+  // URL we capture). If no URL can be found, null is returned.
   const resolveVideoUrl = (videoEl, done) => {
     if (!videoEl) return done(null);
 
@@ -306,6 +415,7 @@
 
     const wasPaused = videoEl.paused;
     const wasMuted = videoEl.muted;
+    const wasTime = videoEl.currentTime;
     let finished = false;
     let timer = null;
 
@@ -314,20 +424,31 @@
       finished = true;
       if (timer) clearInterval(timer);
       try {
-        if (!videoEl.paused) videoEl.pause();
         videoEl.muted = wasMuted;
+        if (wasTime >= 0 && isFinite(wasTime)) videoEl.currentTime = wasTime;
         if (!wasPaused) {
           const p = videoEl.play();
           if (p && p.catch) p.catch(() => {});
+        } else if (!videoEl.paused) {
+          videoEl.pause();
         }
       } catch (e) {}
       done(knownUrlFor(videoEl));
     };
 
     try {
+      activeVideoEl = videoEl;
       videoEl.muted = true;
       const p = videoEl.play();
-      if (p && p.catch) p.catch(() => finish());
+      if (p && p.catch) p.catch(() => {});
+      // The video is already buffered, so a plain play() triggers no network
+      // request. Seek near the end to force a segment fetch whose URL we can
+      // capture.
+      let seekTo = 1;
+      if (videoEl.duration && isFinite(videoEl.duration) && videoEl.duration > 2) {
+        seekTo = videoEl.duration - 0.5;
+      }
+      videoEl.currentTime = seekTo;
     } catch (e) {
       return finish();
     }
@@ -342,10 +463,13 @@
     resolveVideoUrl(videoEl, (url) => {
       if (!url) {
         debugLog("No downloadable video URL found");
+        if (window.DownloadBridge && window.DownloadBridge.toast) {
+          window.DownloadBridge.toast("Impossible de récupérer l'URL vidéo. Relance la lecture puis réessaie.");
+        }
         return;
       }
       if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
-        window.DownloadBridge.downloadUrl(sanitizeVideoUrl(url), "video/mp4");
+        sendCandidates(videoEl);
       } else {
         downloadBase64(sanitizeVideoUrl(url), "video/mp4");
       }
@@ -363,7 +487,7 @@
     if (isVideo) {
       let realUrl = url;
       if (url.startsWith("blob:")) {
-        realUrl = knownUrlFor(mediaElement) || null;
+        realUrl = knownUrlFor(mediaElement);
       }
 
       if (!realUrl) {
@@ -373,7 +497,7 @@
 
       if (window.DownloadBridge && window.DownloadBridge.downloadUrl) {
         // Stream the file natively to avoid loading large videos in memory.
-        window.DownloadBridge.downloadUrl(sanitizeVideoUrl(realUrl), "video/mp4");
+        sendCandidates(mediaElement);
       } else {
         downloadBase64(sanitizeVideoUrl(realUrl), "video/mp4");
       }
@@ -407,10 +531,22 @@
 
   // Extract and download videos or images
   const extractAndDownloadMedia = () => {
+    // When a video view is genuinely active (reel/story/watch viewer with a
+    // VISIBLE <video>), the video is what the user is looking at: download it
+    // even if a poster image is present. Elsewhere, prefer the media in the
+    // CURRENT viewer dialog (a photo) — a stale video element left in the DOM
+    // must never hijack a photo download.
+    if (isInVideoView()) {
+      const videoElement = findVideoInView();
+      if (videoElement && videoElement.src !== lastDownloadedUrl) {
+        downloadVideo(videoElement);
+        lastDownloadedUrl = videoElement.src;
+        return;
+      }
+    }
+
     // Prefer the media in the CURRENT viewer: what the user is actually
-    // looking at decides photo vs video. On a photo dialog this is the photo;
-    // on a reel/story viewer it is the <video> (even when paused and covered
-    // by its poster image).
+    // looking at decides photo vs video.
     const mediaElement = getCurrentMediaElement();
 
     if (mediaElement && mediaElement.src && mediaElement.src !== lastDownloadedUrl) {
@@ -648,4 +784,32 @@
   } else {
     init();
   }
+
+  // Debug hook used from CDP / chrome://inspect to inspect which media URLs
+  // were captured and how they would be classified. No-op in production.
+  window.__litebookCaptured = () => {
+    const summarize = (u) => {
+      const k = classifyMediaUrl(u);
+      let vtag = "";
+      const { tag, vtag: vt } = decodeEfg(u);
+      vtag = vt;
+      return { kind: k, tag, vtag, url: u.slice(0, 160) };
+    };
+    const byEl = [];
+    videoUrlByElement.forEach((list, el) => {
+      byEl.push({
+        src: (el.currentSrc || el.src || "").slice(0, 80),
+        items: list.map((e) => ({
+          kind: e.kind,
+          at: new Date(e.at).toISOString().slice(11, 19),
+          src: (e.src || "").slice(0, 80),
+          url: e.url.slice(0, 160)
+        }))
+      });
+    });
+    return {
+      global: capturedMediaUrls.slice(-15).map((e) => summarize(e.url)),
+      byElement: byEl
+    };
+  };
 })();

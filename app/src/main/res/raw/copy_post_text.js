@@ -24,8 +24,19 @@
     '[aria-label*="menu"]'
   ];
 
-  var HOLD_MS = 450;
-  var MOVE_TOLERANCE = 12;
+  // Comments already expose their own long-press copy (and reactions): the
+  // whole-post copy must never hijack a long-press on a comment.
+  var COMMENT_SELECTORS = [
+    '[role="comment"]',
+    '[aria-label*="comment"]',
+    '[aria-label*="Comment"]',
+    '[data-pagelet*="Comment"]',
+    '[data-comment-preview]',
+    '[data-sigil*="comment"]'
+  ];
+
+  var HOLD_MS = 600;
+  var MOVE_TOLERANCE = 14;
 
   var pressTimer = null;
   var pressStartX = 0;
@@ -70,10 +81,18 @@
     return cleanText(container.innerText || container.textContent);
   };
 
+  var isComment = function(el) {
+    if (!el || el.nodeType !== 1) return false;
+    return !!el.closest(COMMENT_SELECTORS.join(","));
+  };
+
   var findPostContainer = function(target) {
     if (!target || target.nodeType !== 1) return null;
     var el = target;
     while (el && el !== document.body) {
+      // Any comment in the ancestry chain (even one that does not itself
+      // match a post selector) blocks the whole-post copy.
+      if (isComment(el)) return null;
       for (var i = 0; i < POST_SELECTORS.length; i++) {
         if (el.matches(POST_SELECTORS[i])) {
           return el;
@@ -133,6 +152,16 @@
     pressTimer = setTimeout(function() {
       pressTimer = null;
       if (pressTarget) {
+        // If the browser started a native text selection (long-press + drag),
+        // defer to it instead of copying the whole post.
+        var sel = "";
+        try {
+          sel = (window.getSelection() && window.getSelection().toString()) || "";
+        } catch (e) {}
+        if (sel.length > 0) {
+          pressTarget = null;
+          return;
+        }
         var c = findPostContainer(pressTarget);
         if (c) copyPostText(c);
       }
@@ -156,10 +185,18 @@
   };
 
   var onContextMenu = function(event) {
-    // Only block the long-press menu on plain post text. Interactive
-    // elements (Like button, links, menus) must keep the contextmenu event
-    // so Facebook's reaction picker (👍 ❤️ 😄 😮 😓 😠) still opens.
-    if (event.target && !isInteractive(event.target) && findPostContainer(event.target)) {
+    // Only suppress the long-press menu when our copy is actually pending: a
+    // steady hold with no finger movement. If the user moved the finger (to
+    // start a native text selection), the pending copy was cancelled and the
+    // native selection UI must be allowed to appear. Interactive elements
+    // (Like button, links, menus) always keep contextmenu so Facebook's
+    // reaction picker still opens.
+    if (
+      pressTimer &&
+      event.target &&
+      !isInteractive(event.target) &&
+      findPostContainer(event.target)
+    ) {
       event.preventDefault();
     }
   };

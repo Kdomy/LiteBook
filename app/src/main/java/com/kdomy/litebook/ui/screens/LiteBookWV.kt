@@ -281,6 +281,9 @@ fun LiteBookWebView(
         captureBackPresses = false,
         onCreated = { webView ->
 
+            // Allow chrome://inspect (or adb CDP) to debug the embedded page.
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+
             val cookieManager = CookieManager.getInstance()
             cookieManager.setAcceptCookie(true)
             cookieManager.setAcceptThirdPartyCookies(webView, true)
@@ -321,7 +324,11 @@ fun LiteBookWebView(
                     "MaterialYouBridge"
                 )
 
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                // Let the WebView manage its own layers. Forcing a single
+                // hardware layer here can produce partial GPU uploads (tall
+                // photos painted black below a point); the default layer type
+                // avoids that compositing corruption.
+                // setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
                 overScrollMode = View.OVER_SCROLL_NEVER
                 isVerticalScrollBarEnabled = false

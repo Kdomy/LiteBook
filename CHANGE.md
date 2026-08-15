@@ -2,10 +2,20 @@
 
 ## Fixes
 
-- Fix photos in the media viewer loading only halfway: the image is now re-decoded after load, and viewer images are kept out of their own GPU layer (transforms/zoom still work)
-- Fix long-press post copy dropping formatting: line breaks, blank lines, indentation and spacing are now preserved
-- Fix downloading a photo sometimes returning the previous video: a stale <video> element left in the DOM by Facebook no longer hijacks the download, and an expired captured video URL is refused
+- Fix reel/story video downloads doing nothing (or saving the poster image instead of the video): the video is now given priority when a video view is actually active, and the real streamed URL is resolved from the segment fetched right now (reels that auto-advance are supported)
+- Fix downloaded reels playing with a black screen and audio only: the audio-only fragment of the reel stream is skipped and the video fragment is downloaded instead
 - Fix reels/photo downloads reusing a cached URL from an earlier video (unreadable file)
+- Fix downloading a photo sometimes returning the previous video: a stale <video> element left in the DOM by Facebook no longer hijacks the download, and an expired captured video URL is refused
+- Fix tall photos in the media viewer staying partially black: repeated repaint/decoding retries force a complete texture upload (also removes the forced single hardware layer on the WebView)
+- Fix long-press post copy triggering too eagerly and blocking text selection: a longer deliberate hold (600 ms) is required, a finger drag keeps the native selection, and the whole-post copy no longer applies to comments
+- Fix long-press post copy dropping formatting: line breaks, blank lines, indentation and spacing are now preserved
+- Fix photos in the media viewer loading only halfway: the image is now re-decoded after load, and viewer images are kept out of their own GPU layer (transforms/zoom still work)
+- Fix reel videos not appearing in the gallery: videos are now saved into the Movies/LiteBook media collection instead of plain Downloads
+- Fix login/cookie Bloks screen text staying dark and unreadable on the AMOLED theme: the light-background detection now climbs to the outermost painted background (the black page wash), instead of stopping at the first opaque white card, so near-black text is lightened
+
+## Internal
+
+- Enable WebView debugging (chrome://inspect) and add a toast() bridge for download diagnostics
 
 ---
 
