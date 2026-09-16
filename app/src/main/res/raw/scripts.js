@@ -190,6 +190,10 @@
         const overlays = document.querySelectorAll('.loading-overlay');
         overlays.forEach(overlay => {
             overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+            // Never let a stuck Facebook loading overlay swallow taps:
+            // it sometimes stays full-screen after a navigation is done
+            // (e.g. after an account switch), blocking the whole UI.
+            overlay.style.pointerEvents = 'none';
         });
     }
     applyOverlayStyle();
@@ -205,6 +209,46 @@
         childList: true,
         subtree: true
     });
+
+    // A full-screen .loading-overlay is Facebook's SPA/spinner layer. On this
+    // WebView it sometimes never clears after a navigation or an account
+    // switch, permanently covering and blocking the page (the switch actually
+    // succeeds, but the UI appears to stay "loading"). Remove a full-screen
+    // overlay that lingers after the document has finished loading.
+    const coversViewport = (overlay) => {
+        const rect = overlay.getBoundingClientRect();
+        return (
+            rect.width >= window.innerWidth - 2 &&
+            rect.height >= window.innerHeight - 2
+        );
+    };
+
+    const clearStale = () => {
+        document.querySelectorAll('.loading-overlay').forEach((overlay) => {
+            if (coversViewport(overlay)) overlay.remove();
+        });
+    };
+
+    // Full document load: once finished, drop any leftover overlay quickly.
+    if (document.readyState !== 'complete') {
+        window.addEventListener('load', () => setTimeout(clearStale, 1500));
+    }
+
+    // SPA transitions (account switch, navigation inside m.facebook.com):
+    // let a real transition breathe for a few seconds, then clear it.
+    let stuckSince = 0;
+    setInterval(() => {
+        const overlay = document.querySelector('.loading-overlay');
+        if (!overlay || document.readyState !== 'complete' || !coversViewport(overlay)) {
+            stuckSince = 0;
+            return;
+        }
+        stuckSince += 1000;
+        if (stuckSince >= 3000) {
+            overlay.remove();
+            stuckSince = 0;
+        }
+    }, 1000);
 })();
 
 // Hide facebook download button and other distractions at login page
