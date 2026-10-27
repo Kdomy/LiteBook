@@ -21,8 +21,8 @@ extensions.configure<ApplicationExtension> {
         applicationId = "com.kdomy.litebook"
         minSdk = 23
         targetSdk = 36
-        versionCode = 18
-        versionName = "2.0.4"
+        versionCode = 19
+        versionName = "2.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,7 +37,6 @@ extensions.configure<ApplicationExtension> {
             )
             signingConfig = signingConfigs.getByName("debug")
         }
-        debug { applicationIdSuffix = ".test" }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

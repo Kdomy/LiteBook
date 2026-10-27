@@ -1,4 +1,4 @@
-﻿
+
 // Desktop mode identifier
 (() => {
     window.isDesktopMode = () => {
@@ -15,7 +15,7 @@
         if (window.isDesktopMode()) return isHomeUrl;
 
         const hasSpecialButton = Array.from(document.querySelectorAll('[role="button"] span'))
-            .some(span => span.textContent === 'ó±¥†');
+            .some(span => span.textContent === '\u{F1946}');
 
         return isHomeUrl && hasSpecialButton;
     };
@@ -346,7 +346,7 @@ observer.observe(document.body, { childList: true, subtree: true });
 
     const findInsertionPoint = () => {
       const iconSpan = Array.from(document.querySelectorAll('span'))
-        .find(span => span.textContent === 'ó±¥Š');
+        .find(span => span.textContent === '\u{F194A}');
       const container = iconSpan?.closest('div[role="button"]')?.parentNode;
 
       const desktopTarget = document.querySelector(
@@ -359,8 +359,9 @@ observer.observe(document.body, { childList: true, subtree: true });
     const createButton = () => {
       const btn = document.createElement('button');
       btn.id = BUTTON_ID;
+      btn.setAttribute('aria-label', 'LiteBook settings');
       btn.setAttribute('style', `
-        position: ${findInsertionPoint().desktopTarget === null ? 'fixed' : 'block'};
+        position: ${findInsertionPoint().desktopTarget === null ? 'fixed' : 'static'};
         top: 8px;
         right: 100px;
         background: transparent;
@@ -492,16 +493,23 @@ observer.observe(document.body, { childList: true, subtree: true });
     }, attempt === 0 ? 150 : 700);
   };
 
+  const processedSources = new WeakMap();
   const processImage = (img) => {
     if (!(img instanceof HTMLImageElement)) return;
     if (!isViewerImage(img)) return;
+    const source = img.currentSrc || img.src;
+    if (!source || img._fbRedecoding || processedSources.get(img) === source) return;
+    processedSources.set(img, source);
     img.loading = "eager";
+    let started = false;
+    let retries = 0;
     const start = () => {
-      if (!img.isConnected) return;
+      if (started || !img.isConnected || (img.currentSrc || img.src) !== source) return;
       if (!(img.complete && img.naturalWidth > 0)) {
-        setTimeout(start, 300);
+        if (++retries <= 10) setTimeout(start, 300);
         return;
       }
+      started = true;
       heal(img, 0);
     };
     if (typeof img.decode === "function") {
@@ -594,4 +602,142 @@ observer.observe(document.body, { childList: true, subtree: true });
 
   scanViewer();
   scheduleRescan();
+})();
+
+// Profile / Page switch auto-reload helper
+(function() {
+  let switchInProgress = false;
+
+  function exitMenuToFeed() {
+    // 1. Chercher le bouton retour / Menu en haut à gauche de l'écran
+    const candidates = Array.from(document.querySelectorAll('header [role="button"], header a, div[role="banner"] [role="button"], div[role="banner"] a, div[data-bloks-name="bk.components.Flexbox"] [role="button"], [role="button"], a'));
+    const backBtn = candidates.find(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top > 120 || rect.left > 120 || rect.width === 0 || rect.height === 0) return false;
+      const text = (el.textContent || '').trim().toLowerCase();
+      const label = (el.getAttribute('aria-label') || '').toLowerCase();
+      return text.includes('menu') || label.includes('menu') || label.includes('back') || label.includes('retour') || el.querySelector('svg');
+    });
+
+    if (backBtn) {
+      backBtn.click();
+    } else {
+      window.location.href = 'https://m.facebook.com/?ts=' + Date.now();
+    }
+  }
+
+  function triggerSwitchReload() {
+    if (switchInProgress) return;
+    switchInProgress = true;
+
+    // Attendre 1,3 seconde pour que la requête serveur de bascule de session se finalise
+    setTimeout(() => {
+      // Si Facebook a déjà quitté le menu tout seul (ex: bascule profil perso -> page), ne rien faire !
+      const isMenuOpen = window.location.pathname.includes('/menu') ||
+                         window.location.pathname.includes('/bookmarks') ||
+                         document.querySelector('div[role="menu"]') !== null;
+      if (isMenuOpen) {
+        exitMenuToFeed();
+      }
+      setTimeout(() => {
+        switchInProgress = false;
+      }, 2000);
+    }, 1300);
+  }
+
+  // Intercepter les clics sur les réactions pour éviter "Page Not Available"
+  document.addEventListener("click", function(e) {
+    const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    if (/\/ufi\/reaction\/|reaction_type=|\/a\/like\.php/i.test(href)) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        fetch(href, {
+          method: "GET",
+          credentials: "include",
+          headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "*/*" }
+        }).catch(() => {});
+      } catch (err) {}
+      const dock = a.closest('div[role="toolbar"], div[data-sigil*="reactions-dock"], div[data-sigil*="flyout"], div.flyout');
+      if (dock) dock.style.display = "none";
+    }
+  }, true);
+
+  // 1. Intercepter les requêtes fetch vers profile_switch / fxauth
+  if (typeof window.fetch === 'function') {
+    const origFetch = window.fetch;
+    window.fetch = function(...args) {
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+      if (url && (url.includes('profile_switch') || url.includes('/fxauth/'))) {
+        return origFetch.apply(this, args).then(response => {
+          triggerSwitchReload();
+          return response;
+        }).catch(err => {
+          triggerSwitchReload();
+          throw err;
+        });
+      }
+      return origFetch.apply(this, args);
+    };
+  }
+
+  // 2. Intercepter XMLHttpRequest vers profile_switch / fxauth
+  if (window.XMLHttpRequest) {
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+      this._reqUrl = url;
+      return origOpen.apply(this, [method, url, ...rest]);
+    };
+    XMLHttpRequest.prototype.send = function(...args) {
+      if (this._reqUrl && (typeof this._reqUrl === 'string') && 
+          (this._reqUrl.includes('profile_switch') || this._reqUrl.includes('/fxauth/'))) {
+        this.addEventListener('loadend', () => {
+          triggerSwitchReload();
+        });
+      }
+      return origSend.apply(this, args);
+    };
+  }
+
+  // 3. Détecter les clics sur les profils dans le volet « Your Pages and profiles » ou boutons de switch
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    if (!target) return;
+
+    // A. Clic sur le bouton de raccourci rapide (ex: "Dominique Savio Kongo, switch into your profile")
+    const switchBtn = target.closest('[aria-label*="switch into" i], [aria-label*="basculer" i], [aria-label*="switch to" i], [aria-label*="switch" i][aria-label*="profile" i], a[href*="profile_switch"]');
+    if (switchBtn) {
+      triggerSwitchReload();
+      return;
+    }
+
+    // B. Clic sur un bouton d'en-tête de profil avec une image d'avatar dans le menu
+    const menuHeaderBtn = target.closest('div[role="button"], a');
+    if (menuHeaderBtn) {
+      const rect = menuHeaderBtn.getBoundingClientRect();
+      // Le bouton de bascule rapide dans l'en-tête est en haut à droite (top < 150, right > 250)
+      if (rect.top < 150 && rect.right > 250 && menuHeaderBtn.querySelector('img, svg')) {
+        const label = (menuHeaderBtn.getAttribute('aria-label') || '').toLowerCase();
+        if (label.includes('switch') || label.includes('profile') || label.includes('profil') || label.includes('basculer')) {
+          triggerSwitchReload();
+          return;
+        }
+      }
+    }
+
+    // C. Clic dans le volet des profils et pages (« Your Pages and profiles »)
+    const profileDialog = target.closest('div[role="dialog"]');
+    if (profileDialog) {
+      const text = profileDialog.textContent || '';
+      if (text.includes('Pages and profiles') || text.includes('pages et profils') || text.includes('Switch into') || text.includes('Basculer')) {
+        const clickable = target.closest('div[role="button"], div[role="radio"], div[role="checkbox"], a, label');
+        if (clickable && !clickable.closest('div[aria-label*="Close"], div[role="button"][aria-label*="Fermer"]')) {
+          triggerSwitchReload();
+        }
+      }
+    }
+  }, true);
 })();

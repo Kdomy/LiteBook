@@ -1,3 +1,21 @@
+# LiteBook v2.0.5
+
+## Fixes
+
+- Fix LiteBook settings button missing on the mobile feed: corrected malformed glyph comparisons in the feed detection script so `isFeed()` correctly recognizes `m.facebook.com` and the settings button is shown again.
+- Harden link handling and navigation: preserve URL parameters/fragments when sanitizing, properly handle Facebook redirectors (`l.facebook.com`/`lm.facebook.com`), reject userinfo/invalid hosts and block navigation to non-Facebook domains (including explicit malicious intents).
+- Improve script loading: avoid creating/retaining a network HTTP client when running in local-scripts mode, read and assemble scripts on `Dispatchers.IO`, close remote clients safely and ensure script boundaries don't merge across concatenation.
+- Reduce repeated image repair loops in the viewer: add source tracking, single-pass processing, limited retries and guards to prevent infinite rescans/re-entrancy.
+- Limit WebView debugging: only enable remote/web debugging when the app is debuggable (`FLAG_DEBUGGABLE`).
+- Improve URL policy tests and add feed-detection tests for the corrected glyph checks.
+
+## Internal
+
+- Add unit tests for script loading and URL/link policy.
+- Add Node test utilities for image-repair regression and feed-detection checks.
+
+---
+
 # LiteBook v2.0.4
 
 ## Fixes

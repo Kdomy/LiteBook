@@ -1,4 +1,4 @@
-﻿package com.kdomy.litebook.utils
+package com.kdomy.litebook.utils
 
 import com.multiplatform.webview.request.RequestInterceptor
 import com.multiplatform.webview.request.WebRequest
@@ -14,11 +14,10 @@ class ExternalRequestInterceptor(
         navigator: WebViewNavigator
     ): WebRequestInterceptResult {
 
-        val internalUrlRegex = Regex(
-            """https?://(?!(?:l|lm)\.)[^/]*(?:facebook|messenger)\.com/.*"""
-        )
         val sanitizedUrl = fbRedirectSanitizer(request.url)
-        return if (internalUrlRegex.containsMatchIn(sanitizedUrl) && request.isForMainFrame) {
+        val isInternal = isInternalWebUrl(request.url)
+
+        return if (isInternal) {
             WebRequestInterceptResult.Allow
         } else {
             handleExternalUrl(sanitizedUrl)

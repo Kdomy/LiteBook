@@ -206,16 +206,4 @@
   document.addEventListener("touchend", onTouchEnd, { passive: true });
   document.addEventListener("touchcancel", onTouchEnd, { passive: true });
   document.addEventListener("contextmenu", onContextMenu, true);
-
-  // Diagnostic: intercept any navigation that looks like a reaction action.
-  // If the reaction picker tap causes "page not available", the console will
-  // show the URL that was followed.
-  document.addEventListener("click", function(e) {
-    var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
-    if (!a) return;
-    var href = a.getAttribute("href") || "";
-    if (/react|like|emoji|reel|feedback/i.test(href)) {
-      console.warn("[LiteBook] Reaction-related navigation:", href, a);
-    }
-  }, true);
 })();

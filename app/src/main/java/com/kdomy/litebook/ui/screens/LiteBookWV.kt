@@ -1,6 +1,7 @@
-﻿package com.kdomy.litebook.ui.screens
+package com.kdomy.litebook.ui.screens
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebSettings
@@ -282,7 +283,9 @@ fun LiteBookWebView(
         onCreated = { webView ->
 
             // Allow chrome://inspect (or adb CDP) to debug the embedded page.
-            android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+            android.webkit.WebView.setWebContentsDebuggingEnabled(
+                (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            )
 
             val cookieManager = CookieManager.getInstance()
             cookieManager.setAcceptCookie(true)

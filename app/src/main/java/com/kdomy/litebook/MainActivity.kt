@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import com.kdomy.litebook.ui.screens.LiteBookWebView
 import com.kdomy.litebook.ui.theme.LiteBookTheme
+import com.kdomy.litebook.utils.isInternalWebUrl
 
 class MainActivity : ComponentActivity() {
 
@@ -18,7 +19,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        urlState.value = intent?.data?.toString()
+        urlState.value = intent?.data?.toString()?.takeIf(::isInternalWebUrl)
 
         setContent {
             LiteBookTheme {
@@ -33,6 +34,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent?.data?.toString()?.let { urlState.value = it }
+        intent.data?.toString()?.takeIf(::isInternalWebUrl)?.let { urlState.value = it }
     }
 }
