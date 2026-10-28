@@ -58,11 +58,11 @@ jobs:
           fi
           $APKSIGNER sign \
             --ks $RUNNER_TEMP/keystores/keystore.jks \
-            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
-            --out app-release.apk \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
             app/build/outputs/apk/release/app-release.apk
+            cp app/build/outputs/apk/release/app-release.apk app-release.apk
 
       - name: Clean Up Keystore
         if: always()
